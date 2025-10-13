@@ -1,0 +1,42 @@
+#!/bin/sh
+
+set -e
+
+COMMAND="$1"
+OPTION="$2"
+APPUSER="feedarium"
+APP_CONTAINER="app"
+USE_PGSQL=""
+if [ "$OPTION" = "--pgsql" ]; then
+  USE_PGSQL="--profile pgsql"
+fi
+
+case "$COMMAND" in
+  build)
+    echo "Setting up environment..."
+    cp -n .env.example .env || echo ".env already exists."
+    docker compose $USE_PGSQL build
+    docker compose $USE_PGSQL up -d
+    docker compose exec $APP_CONTAINER php artisan key:generate
+    docker compose exec $APP_CONTAINER composer install
+    docker compose exec $APP_CONTAINER npm install
+    docker compose exec $APP_CONTAINER npm run build
+    docker compose exec $APP_CONTAINER php artisan migrate:fresh --force
+    ;;
+  up)
+    echo "Starting containers..."
+    docker compose $USE_PGSQL up -d
+    ;;
+  down)
+    echo "Stopping containers..."
+    docker compose $USE_PGSQL down
+    ;;
+  workspace)
+    echo "Accessing app container..."
+    docker compose exec $APP_CONTAINER bash -i
+    ;;
+  *)
+    echo "Usage: $0 {build|up|down|workspace} [--pgsql]"
+    exit 1
+    ;;
+esac

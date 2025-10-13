@@ -20,8 +20,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-secret}
     depends_on:
       - redis
-      # Only depend on PostgreSQL if it's enabled
-      - ${DB_CONNECTION:-none}
     networks:
       - feedarium
 
@@ -56,12 +54,11 @@ services:
       - POSTGRES_DB=${DB_DATABASE:-laravel}
       - POSTGRES_USER=${DB_USERNAME:-laravel}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-secret}
-      - POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --lc-collate=C --lc-ctype=C
     volumes:
       - feedarium-pgsql:/var/lib/postgresql/data
     networks:
       - feedarium
-    # This service is optional and only started when DB_CONNECTION=pgsql
     profiles: ["pgsql"]
 
 networks:

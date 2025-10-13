@@ -37,6 +37,18 @@ RUN composer global require nunomaduro/larastan friendsofphp/php-cs-fixer --pref
 # Add Composer global bin to PATH
 ENV PATH="/root/.composer/vendor/bin:$PATH"
 
+# Install Node.js and npm for frontend asset building
+RUN apk add --no-cache nodejs npm
+
+ENV APPUSER=feedarium
+
+# Create non-root user with home and bash shell, set permissions
+RUN adduser -D -u 1000 -h /home/"$APPUSER" -s /bin/bash "$APPUSER" \
+    && mkdir -p /var/www/html \
+    && chown -R "$APPUSER":"$APPUSER" /var/www/html
+
 WORKDIR /var/www/html
+
+USER "$APPUSER"
 
 CMD ["php-fpm"]

@@ -7,17 +7,28 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Http\Requests\UpdateCategoryRequest;
+use App\Domains\Category\Requests\UpdateCategoryRequest;
 
-class UpdateCategoryJob
+final class UpdateCategoryJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(UpdateCategoryRequest $request, int $id): Category
-    {
-        $category = Category::findOrFail($id);
-        $category->update($request->validated());
+    public function __construct(
+        private readonly UpdateCategoryRequest $request,
+        private readonly int $id,
+    ) {}
 
-        return $category;
+    public function handle(): Category
+    {
+        $category = Category::query()->findOrFail($this->id);
+
+        $category->update([
+            'name' => $this->request->string('name')->toString(),
+            'description' => $this->request->filled('description')
+                ? $this->request->string('description')->toString()
+                : null,
+        ]);
+
+        return $category->fresh();
     }
 }

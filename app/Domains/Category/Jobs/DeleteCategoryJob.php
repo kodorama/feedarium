@@ -8,12 +8,16 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 
-class DeleteCategoryJob
+final class DeleteCategoryJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(int $id): void
+    public function __construct(
+        private readonly int $id,
+    ) {}
+
+    public function handle(): void
     {
-        Category::findOrFail($id)->delete();
+        Category::query()->findOrFail($this->id)->delete();
     }
 }

@@ -6,10 +6,12 @@ use App\Models\Category;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 
-class ListCategoryController extends Controller
+final class ListCategoryController extends Controller
 {
     public function __invoke(): JsonResponse
     {
-        return response()->json(['categories' => Category::all()]);
+        $categories = Category::query()->latest()->get();
+
+        return response()->json(['categories' => $categories]);
     }
 }

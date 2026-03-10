@@ -4,7 +4,7 @@ namespace App\Domains\Feed\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateFeedRequest extends FormRequest
+final class UpdateFeedRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -19,6 +19,7 @@ class UpdateFeedRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'active' => ['boolean'],
             'category_id' => ['nullable', 'exists:categories,id'],
+            'hub_url' => ['nullable', 'url', 'max:500'],
         ];
     }
 }

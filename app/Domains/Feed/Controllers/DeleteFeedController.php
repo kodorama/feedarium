@@ -2,15 +2,18 @@
 
 namespace App\Domains\Feed\Controllers;
 
-use App\Models\Feed;
 use Illuminate\Http\Response;
+use Illuminate\Routing\Controller;
+use App\Domains\Feed\Jobs\DeleteFeedJob;
+use Illuminate\Foundation\Bus\DispatchesJobs;
 
-class DeleteFeedController
+final class DeleteFeedController extends Controller
 {
+    use DispatchesJobs;
+
     public function __invoke(int $id): Response
     {
-        $feed = Feed::findOrFail($id);
-        $feed->delete();
+        $this->dispatch(new DeleteFeedJob($id));
 
         return response()->noContent();
     }

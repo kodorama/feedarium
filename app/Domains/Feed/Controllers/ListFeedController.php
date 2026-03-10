@@ -3,18 +3,19 @@
 namespace App\Domains\Feed\Controllers;
 
 use App\Models\Feed;
-use Inertia\Inertia;
-use Inertia\Response;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller;
 
-class ListFeedController
+final class ListFeedController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request): JsonResponse
     {
-        $feeds = Feed::query()->latest()->get();
+        $feeds = Feed::query()
+            ->with('category')
+            ->latest()
+            ->get();
 
-        return Inertia::render('Feed/Index', [
-            'feeds' => $feeds,
-        ]);
+        return response()->json(['feeds' => $feeds]);
     }
 }

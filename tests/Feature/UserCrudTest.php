@@ -1,6 +1,11 @@
 <?php
 
 describe('User CRUD', function () {
+    beforeEach(function () {
+        $admin = \App\Models\User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+    });
+
     it('can create a user', function () {
         $response = $this->postJson('/api/users', [
             'name' => 'Test User',

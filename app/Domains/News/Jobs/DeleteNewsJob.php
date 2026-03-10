@@ -8,12 +8,16 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 
-class DeleteNewsJob
+final class DeleteNewsJob
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(int $id): void
+    public function __construct(
+        private readonly int $id,
+    ) {}
+
+    public function handle(): void
     {
-        News::findOrFail($id)->delete();
+        News::query()->findOrFail($this->id)->delete();
     }
 }

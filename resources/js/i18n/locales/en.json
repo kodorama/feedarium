@@ -1,0 +1,81 @@
+{
+    "nav": {
+        "dashboard": "Dashboard",
+        "feeds": "Feeds",
+        "categories": "Categories",
+        "users": "Users",
+        "saved": "Saved Articles",
+        "settings": "Settings"
+    },
+    "general": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "create": "Create",
+        "update": "Update",
+        "search": "Search",
+        "loading": "Loading…",
+        "no_results": "No results found.",
+        "confirm_delete": "Are you sure you want to delete this?",
+        "success": "Operation completed successfully.",
+        "error": "An error occurred. Please try again.",
+        "back": "Back",
+        "close": "Close",
+        "read_more": "Read more",
+        "read_later": "Save for later",
+        "remove_saved": "Remove from saved",
+        "dark_mode": "Dark",
+        "light_mode": "Light",
+        "system_mode": "System"
+    },
+    "feeds": {
+        "title": "Feeds",
+        "create": "Add Feed",
+        "edit": "Edit Feed",
+        "name": "Feed Name",
+        "url": "Feed URL",
+        "description": "Description",
+        "active": "Active",
+        "category": "Category",
+        "hub_url": "Hub URL (WebSub)",
+        "created": "Feed created successfully.",
+        "updated": "Feed updated successfully.",
+        "deleted": "Feed deleted successfully.",
+        "search_placeholder": "Search feeds…"
+    },
+    "news": {
+        "title": "Articles",
+        "saved_title": "Saved Articles",
+        "no_saved": "You have no saved articles yet.",
+        "search_placeholder": "Search articles…",
+        "saved": "Article saved.",
+        "unsaved": "Article removed from saved list.",
+        "read_article": "Read article",
+        "published": "Published",
+        "by": "by"
+    },
+    "categories": {
+        "title": "Categories",
+        "create": "Add Category",
+        "edit": "Edit Category",
+        "name": "Name",
+        "description": "Description",
+        "created": "Category created successfully.",
+        "updated": "Category updated successfully.",
+        "deleted": "Category deleted successfully."
+    },
+    "auth": {
+        "login": "Log in",
+        "logout": "Log out",
+        "register": "Register",
+        "email": "Email",
+        "password": "Password",
+        "name": "Name",
+        "remember_me": "Remember me",
+        "forgot_password": "Forgot password?",
+        "reset_password": "Reset Password",
+        "confirm_password": "Confirm Password"
+    }
+}
+

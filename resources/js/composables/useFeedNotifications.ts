@@ -8,8 +8,8 @@ export function useFeedNotifications() {
   onMounted(() => {
     // Replace with actual Reverb/Echo setup
     // Example: window.Echo.channel('feeds').listen('FeedUpdated', () => { ... })
-    if (window.Echo) {
-      channel = window.Echo.channel('feeds').listen('FeedUpdated', () => {
+    if ((window as any).Echo) {
+      channel = (window as any).Echo.channel('feeds').listen('FeedUpdated', () => {
         feedUpdated.value = true
       })
     }

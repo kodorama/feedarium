@@ -3,13 +3,17 @@
 namespace App\Domains\User\Controllers;
 
 use Illuminate\Http\Response;
+use Illuminate\Routing\Controller;
 use App\Domains\User\Jobs\DeleteUserJob;
+use Illuminate\Foundation\Bus\DispatchesJobs;
 
-class DeleteUserController
+final class DeleteUserController extends Controller
 {
+    use DispatchesJobs;
+
     public function __invoke(int $id): Response
     {
-        DeleteUserJob::dispatchSync($id);
+        $this->dispatchSync(new DeleteUserJob($id));
 
         return response()->noContent();
     }

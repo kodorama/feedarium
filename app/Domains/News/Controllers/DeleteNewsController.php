@@ -7,14 +7,14 @@ use Illuminate\Routing\Controller;
 use App\Domains\News\Jobs\DeleteNewsJob;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 
-class DeleteNewsController extends Controller
+final class DeleteNewsController extends Controller
 {
     use DispatchesJobs;
 
     public function __invoke(int $id): JsonResponse
     {
-        $this->dispatchSync(new DeleteNewsJob, $id);
+        $this->dispatchSync(new DeleteNewsJob($id));
 
-        return response()->json(['success' => true]);
+        return response()->json(['deleted' => true]);
     }
 }

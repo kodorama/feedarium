@@ -6,14 +6,18 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use App\Domains\User\Requests\RegisterAdminRequest;
 
-class CreateAdminUserJob
+final class CreateAdminUserJob
 {
-    public function handle(RegisterAdminRequest $request): User
+    public function __construct(
+        private readonly RegisterAdminRequest $request,
+    ) {}
+
+    public function handle(): User
     {
         return User::query()->create([
-            'name' => $request->validated()['name'],
-            'email' => $request->validated()['email'],
-            'password' => Hash::make($request->validated()['password']),
+            'name' => $this->request->string('name')->toString(),
+            'email' => $this->request->string('email')->toString(),
+            'password' => Hash::make($this->request->string('password')->toString()),
             'is_admin' => true,
         ]);
     }

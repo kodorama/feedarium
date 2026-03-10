@@ -1,70 +1,90 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: feedarium-app
-    working_dir: /var/www/html
-    volumes:
-      - .:/var/www/html
-      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
-    environment:
-      - APP_ENV=local
-      # Default to SQLite, but can be overridden
-      - DB_CONNECTION=${DB_CONNECTION:-sqlite}
-      - DB_DATABASE=${DB_DATABASE:-/var/www/html/database/database.sqlite}
-      # PostgreSQL connection variables (used if DB_CONNECTION=pgsql)
-      - DB_HOST=${DB_HOST:-pgsql}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USERNAME=${DB_USERNAME:-laravel}
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
-    depends_on:
-      - redis
-    networks:
-      - feedarium
+    app:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+        working_dir: /var/www/html
+        volumes:
+            - .:/var/www/html
+            - ./docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+        environment:
+            APP_ENV: local
+            APP_URL: http://localhost:${NGINX_PORT:-8080}
+            SANCTUM_STATEFUL_DOMAINS: localhost:${NGINX_PORT:-8080},localhost,127.0.0.1
+            DB_CONNECTION: ${DB_CONNECTION:-sqlite}
+            DB_DATABASE: ${DB_DATABASE:-/var/www/html/database/database.sqlite}
+            DB_HOST: ${DB_HOST:-pgsql}
+            DB_PORT: ${DB_PORT:-5432}
+            DB_USERNAME: ${DB_USERNAME:-laravel}
+            DB_PASSWORD: ${DB_PASSWORD:-secret}
+            SESSION_DRIVER: file
+            QUEUE_CONNECTION: redis
+            CACHE_STORE: redis
+            REDIS_HOST: redis
+        depends_on:
+            - redis
+        networks:
+            - feedarium
 
-  nginx:
-    image: nginx:alpine
-    container_name: feedarium-nginx
-    ports:
-      - "${NGINX_PORT:-8080}:80"
-    volumes:
-      - .:/var/www/html
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-    depends_on:
-      - app
-    networks:
-      - feedarium
+    nginx:
+        image: nginx:alpine
+        ports:
+            - "${NGINX_PORT:-8080}:80"
+        volumes:
+            - .:/var/www/html
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+        depends_on:
+            - app
+        networks:
+            - feedarium
 
-  redis:
-    image: redis:alpine
-    container_name: feedarium-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    networks:
-      - feedarium
+    queue:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+        working_dir: /var/www/html
+        command: php artisan queue:work --tries=3 --timeout=120
+        volumes:
+            - .:/var/www/html
+        depends_on:
+            - redis
+        networks:
+            - feedarium
 
-  # Optional PostgreSQL service
-  pgsql:
-    image: postgres:15-alpine
-    container_name: feedarium-pgsql
-    ports:
-      - "${FORWARD_DB_PORT:-5432}:5432"
-    environment:
-      - POSTGRES_DB=${DB_DATABASE:-laravel}
-      - POSTGRES_USER=${DB_USERNAME:-laravel}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-secret}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --lc-collate=C --lc-ctype=C
-    volumes:
-      - feedarium-pgsql:/var/lib/postgresql/data
-    networks:
-      - feedarium
-    profiles: ["pgsql"]
+    scheduler:
+        build:
+            context: .
+            dockerfile: docker/Dockerfile
+        working_dir: /var/www/html
+        command: php artisan schedule:work
+        volumes:
+            - .:/var/www/html
+        depends_on:
+            - redis
+        networks:
+            - feedarium
+
+    redis:
+        image: redis:alpine
+        networks:
+            - feedarium
+
+    pgsql:
+        image: postgres:15-alpine
+        environment:
+            POSTGRES_DB: ${DB_DATABASE_PG:-feedarium}
+            POSTGRES_USER: ${DB_USERNAME:-laravel}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+        ports:
+            - "${DB_PORT:-5432}:5432"
+        volumes:
+            - feedarium-pgsql:/var/lib/postgresql/data
+        networks:
+            - feedarium
+        profiles: ["pgsql"]
 
 networks:
-  feedarium:
-    driver: bridge
+    feedarium:
 
 volumes:
-  feedarium-pgsql:
-    driver: local
+    feedarium-pgsql:

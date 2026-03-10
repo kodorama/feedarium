@@ -9,15 +9,14 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 
-class DeleteFeedJob implements ShouldQueue
+final class DeleteFeedJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public int $feedId) {}
+    public function __construct(public readonly int $feedId) {}
 
     public function handle(): void
     {
-        $feed = Feed::findOrFail($this->feedId);
-        $feed->delete();
+        Feed::query()->findOrFail($this->feedId)->delete();
     }
 }

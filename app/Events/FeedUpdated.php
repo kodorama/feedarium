@@ -5,9 +5,9 @@ namespace App\Events;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
-class FeedUpdated implements ShouldBroadcast
+class FeedUpdated implements ShouldBroadcastNow
 {
     use InteractsWithSockets, SerializesModels;
 

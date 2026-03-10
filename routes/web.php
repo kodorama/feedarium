@@ -22,6 +22,10 @@ Route::get('dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Saved articles
+    Route::get('/saved', function () {
+        return Inertia::render('feeds/Saved');
+    })->name('saved.index');
     // Category CRUD pages
     Route::get('/categories', function () {
         return Inertia::render('Category/Index');

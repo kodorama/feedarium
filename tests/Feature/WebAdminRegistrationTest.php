@@ -2,7 +2,7 @@
 
 describe('Admin Registration (Web)', function () {
     it('registers the first admin user via the web route', function () {
-        \App\Models\User::query()->delete(); // Ensure no users exist
+        \App\Models\User::query()->delete();
 
         $response = $this->post('/register-admin', [
             'name' => 'Admin User',

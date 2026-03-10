@@ -3,9 +3,29 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class News extends Model
+/**
+ * @property int $id
+ * @property int $feed_id
+ * @property string $title
+ * @property string $link
+ * @property string|null $description
+ * @property \Illuminate\Support\Carbon|null $published_at
+ * @property string|null $author
+ * @property string|null $guid
+ * @property bool $is_read
+ * @property string|null $thumbnail_url
+ * @property string|null $full_body
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read Feed $feed
+ * @property-read Collection<int, User> $savedByUsers
+ */
+final class News extends Model
 {
     use HasFactory;
 
@@ -17,10 +37,27 @@ class News extends Model
         'published_at',
         'author',
         'guid',
+        'is_read',
+        'thumbnail_url',
+        'full_body',
     ];
 
-    public function feed()
+    protected function casts(): array
+    {
+        return [
+            'published_at' => 'datetime',
+            'is_read' => 'boolean',
+        ];
+    }
+
+    public function feed(): BelongsTo
     {
         return $this->belongsTo(Feed::class);
+    }
+
+    public function savedByUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'saved_articles')
+            ->withPivot('created_at');
     }
 }

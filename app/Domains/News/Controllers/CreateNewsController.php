@@ -8,13 +8,13 @@ use App\Domains\News\Jobs\CreateNewsJob;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use App\Domains\News\Requests\CreateNewsRequest;
 
-class CreateNewsController extends Controller
+final class CreateNewsController extends Controller
 {
     use DispatchesJobs;
 
     public function __invoke(CreateNewsRequest $request): JsonResponse
     {
-        $news = $this->dispatchSync(new CreateNewsJob, $request);
+        $news = $this->dispatchSync(new CreateNewsJob($request));
 
         return response()->json(['news' => $news], 201);
     }

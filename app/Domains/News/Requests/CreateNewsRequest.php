@@ -4,7 +4,7 @@ namespace App\Domains\News\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class CreateNewsRequest extends FormRequest
+final class CreateNewsRequest extends FormRequest
 {
     public function authorize(): bool
     {

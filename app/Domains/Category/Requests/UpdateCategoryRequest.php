@@ -4,7 +4,7 @@ namespace App\Domains\Category\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateCategoryRequest extends FormRequest
+final class UpdateCategoryRequest extends FormRequest
 {
     public function authorize(): bool
     {

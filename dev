@@ -4,7 +4,6 @@ set -e
 
 COMMAND="$1"
 OPTION="$2"
-APPUSER="feedarium"
 APP_CONTAINER="app"
 USE_PGSQL=""
 if [ "$OPTION" = "--pgsql" ]; then
@@ -17,8 +16,8 @@ case "$COMMAND" in
     cp -n .env.example .env || echo ".env already exists."
     docker compose $USE_PGSQL build
     docker compose $USE_PGSQL up -d
-    docker compose exec $APP_CONTAINER php artisan key:generate
     docker compose exec $APP_CONTAINER composer install
+    docker compose exec $APP_CONTAINER php artisan key:generate
     docker compose exec $APP_CONTAINER npm install
     docker compose exec $APP_CONTAINER npm run build
     docker compose exec $APP_CONTAINER php artisan migrate:fresh --force

@@ -5,6 +5,100 @@
 
 ---
 
+## Phase 0 — Routing, Feeds Sidebar & Admin Panel
+> Core UX: guest/auth root redirect, feeds sidebar, Filament admin with categories/feeds/settings.
+
+### Routing
+- [x] `GET /` — redirects guests to `/login`; redirects authenticated users to `/feeds`
+- [x] `GET /feeds` — renders `feeds/Index` Inertia page (auth required); passes `selectedFeedId` from `?feed_id` query param
+- [x] `GET /saved` — renders `feeds/Saved` Inertia page (auth required)
+- [x] Use `Model::query()` in all route closures (no static shortcuts)
+- [x] Duplicate route definitions removed from `routes/web.php` (was duplicated twice)
+- [x] Post-login redirect updated to `feeds.index` (was `dashboard`) in `AuthenticatedSessionController`
+
+### Sidebar (single unified sidebar — `resources/js/components/AppSidebar.vue`)
+- [x] Two-sidebar problem resolved — redundant inline sidebars removed from `feeds/Index.vue` and `feeds/Saved.vue`
+- [x] `AppSidebar.vue` rewritten with one merged sidebar containing:
+  - [x] "All Articles" button — navigates to `/feeds`, clears feed filter
+  - [x] "Saved Articles" link — navigates to `/saved`
+  - [x] Categories section (`SidebarGroupLabel`) with collapsible category groups
+  - [x] Uncategorized feeds listed directly under the group
+  - [x] Feed items nested under each category via `SidebarMenuSub`
+  - [x] Favicon shown per feed; falls back to Rss icon
+  - [x] Clicking a feed navigates to `/feeds?feed_id=X` via `router.visit`
+  - [x] Active state derived from `selectedFeedId` shared prop
+  - [x] "Settings" link at the bottom of the sidebar content
+  - [x] "Dashboard" link removed (redundant)
+  - [x] GitHub/Docs footer links removed
+- [x] `sidebarCategories` and `sidebarFeeds` moved to `HandleInertiaRequests::share()` — available on every page for the sidebar, no longer duplicated in route closures
+- [x] `selectedFeedId` passed as Inertia prop from `/feeds` route (read from `?feed_id` query param)
+- [x] `feeds/Index.vue` watches `selectedFeedId` prop and reloads articles on change
+
+### Settings — Categories & Feed Sources (`/settings/categories`, `/settings/feeds`)
+- [x] `resources/js/layouts/settings/Layout.vue` — "Categories" and "Feed Sources" added to settings nav
+- [x] `routes/settings.php` — `GET /settings/categories` → `settings/Categories` and `GET /settings/feeds` → `settings/FeedSources` added
+- [x] `resources/js/pages/settings/Categories.vue` — inline CRUD: list, add, edit, delete categories (uses existing `/api/categories` endpoints)
+- [x] `resources/js/pages/settings/FeedSources.vue` — inline CRUD: list, add, edit, delete, toggle feeds (uses existing `/api/feeds` endpoints)
+- [x] No new backend controllers/jobs required — all existing domain controllers reused
+
+### Admin panel — Filament (`app/Filament/`)
+- [x] `App\Filament\Resources\CategoryResource` — list, create, edit, delete categories (still available for admin use)
+- [x] `App\Filament\Resources\FeedResource` — list, create, edit, delete feed sources (still available for admin use)
+- [x] `App\Filament\Pages\AdminSettings` — Livewire settings page with theme, language, timezone, password
+- [x] `App\Domains\User\Jobs\UpdateAdminPasswordJob` — created; uses `Model::query()` + `Hash::make()`
+
+### Tests
+- [x] `tests/Feature/DashboardTest.php` — covers routing assertions (guest → login, auth → feeds, feeds/saved Inertia responses)
+- [x] `tests/Feature/Auth/AuthenticationTest.php` — updated post-login redirect assertion to `feeds.index`
+- [x] `tests/Feature/AdminRegistrationTest.php` — updated "users exist" assertion to redirect to login (not Inertia Welcome)
+
+### Remaining gaps
+- [ ] Feeds sidebar not shown on mobile (sidebar collapses to icon on small screens per SidebarProvider); mobile drawer not yet implemented
+- [ ] Language and timezone changes only show a notification — they do not persist to `.env` automatically (by design)
+
+---
+
+## Phase 0b — Bug Fixes & UX Polish
+> Fixes for issues found after Phase 0 implementation.
+
+### Settings — Categories & Feed Sources list not loading
+- [x] `ListCategoryController` returns `{ categories: [...] }` — settings page now reads `res.data.categories` correctly
+- [x] `ListFeedController` returns `{ feeds: [...] }` — settings page now reads `res.data.feeds` correctly
+- [x] Categories page: `loadCategories()` uses `res.data.categories ?? res.data.data ?? res.data`
+- [x] FeedSources page: `loadData()` uses `feedsRes.data.feeds` and `catsRes.data.categories`
+
+### Settings — Success / error feedback
+- [x] `Categories.vue` — auto-dismissing toast notification (3.5 s) shown on create, update, delete success/error
+- [x] `FeedSources.vue` — same toast pattern for create, update, delete, toggle operations
+- [x] Toast uses green/red styling with Transition animation
+
+### Feed listing — Thumbnail images blocked (403)
+- [x] Added `referrerpolicy="no-referrer"` to all `<img>` tags showing remote thumbnails in `feeds/Index.vue`
+- [x] Added `@error` handler to hide broken images gracefully instead of showing broken-image icon
+- [x] Same fix applied inside the article reader modal
+
+### Feed listing — HTML tags in article descriptions
+- [x] Added `stripHtml(html)` utility in `feeds/Index.vue` using `DOMParser` (handles entities + tags)
+- [x] Applied to article card description preview (`line-clamp-2`)
+- [x] Applied to modal fallback description display
+
+### Feed listing — Article click opens modal (not new tab)
+- [x] `openReader(article)` now always sets `readerArticle.value = article` regardless of `full_body`
+- [x] Modal shows `full_body` (rendered HTML) when available, falls back to plain-text stripped `description`
+- [x] Modal includes thumbnail, feed/date/author meta, save/unsave button, and "Read full article" external link
+- [x] Modal closes by clicking the backdrop (`@click.self`) or the ✕ button
+
+### Feed listing — Whole card clickable + grid layout toggle
+- [x] Entire `<li>` card is now clickable (`cursor-pointer`, `@click="openReader(article)"`) — not just the title
+- [x] External-link `<a>` and bookmark `<button>` use `@click.stop` to prevent bubbling to the card click handler
+- [x] Title changed from `<button>` to `<span>` (interaction is on the card)
+- [x] View-mode toggle added above the news list: List (LayoutList icon) and Grid (LayoutGrid icon)
+- [x] Grid mode renders `grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4` with stacked card layout (image on top, content below)
+- [x] List mode keeps the existing horizontal layout (thumbnail left, content right)
+- [x] Active toggle button highlighted with `bg-primary text-primary-foreground`
+
+---
+
 ## Phase 1 — Schema Foundations
 > Add every column and pivot table needed by later phases before any logic is built.
 
@@ -281,4 +375,4 @@
 
 ---
 
-*Last updated: 2026-03-09*
+*Last updated: 2026-03-30 — Phase 0b: Settings list fixed; toasts added; image 403 fixed; HTML stripped from descriptions; modal always on click; whole card clickable with cursor-pointer; list/grid toggle added (3-col grid with LayoutList/LayoutGrid icons).*

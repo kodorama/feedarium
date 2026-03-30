@@ -25,6 +25,8 @@ RUN apk add --no-cache \
     gcc \
     gmp-dev \
     openssl-dev \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
     && docker-php-ext-install -j$(nproc) gd intl pdo pdo_mysql pdo_pgsql pdo_sqlite zip bcmath opcache xml gmp
 

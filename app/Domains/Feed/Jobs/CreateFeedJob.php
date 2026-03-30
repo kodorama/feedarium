@@ -19,9 +19,13 @@ final class CreateFeedJob
 
     public function handle(): Feed
     {
+        $url = $this->request->string('url')->toString();
+        $host = parse_url($url, PHP_URL_HOST) ?? '';
+        $faviconUrl = $host ? 'https://www.google.com/s2/favicons?domain='.urlencode($host).'&sz=32' : null;
+
         $feed = Feed::query()->create([
             'name' => $this->request->string('name')->toString(),
-            'url' => $this->request->string('url')->toString(),
+            'url' => $url,
             'description' => $this->request->filled('description')
                 ? $this->request->string('description')->toString()
                 : null,
@@ -32,11 +36,15 @@ final class CreateFeedJob
             'hub_url' => $this->request->filled('hub_url')
                 ? $this->request->string('hub_url')->toString()
                 : null,
+            'favicon_url' => $faviconUrl,
         ]);
 
         if ($feed->hub_url) {
             SubscribeToHubJob::dispatch($feed->id);
         }
+
+        // Immediately kick off the first fetch in the background queue
+        FetchFeedJob::dispatch($feed->id);
 
         return $feed;
     }

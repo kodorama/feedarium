@@ -35,81 +35,92 @@ Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vu
 
 ### Using Docker (Recommended)
 
-The easiest way to get started with Feedarium is using the provided Docker configuration.
+Feedarium ships with a `dev` helper script that wraps all Docker Compose commands.
+Make it executable once after cloning:
+
+```bash
+chmod +x dev
+```
+
+#### Default setup (SQLite + Redis)
 
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/feedarium.git
+git clone https://github.com/kodorama/feedarium.git
 cd feedarium
 ```
 
-2. **Copy the environment file**
+2. **Build and start the environment**
+
+This single command copies `.env.example`, builds the images, starts all containers,
+installs dependencies, generates the application key, and runs the migrations:
 
 ```bash
-cp .env.example .env
+./dev build
 ```
 
-3. **Start the Docker environment**
-
-```bash
-docker-compose up -d
-```
-
-4. **Install PHP dependencies**
-
-```bash
-docker-compose exec app composer install
-```
-
-5. **Generate application key**
-
-```bash
-docker-compose exec app php artisan key:generate
-```
-
-6. **Run database migrations**
-
-```bash
-docker-compose exec app php artisan migrate
-```
-
-7. **Install and build frontend assets**
-
-```bash
-docker-compose exec app npm install
-docker-compose exec app npm run build
-```
-
-8. **Access Feedarium**
+3. **Access Feedarium**
 
 Visit [http://localhost:8080](http://localhost:8080) in your browser.
 
-### Using PostgreSQL (Optional)
+> The default port is `8080`. Override it by setting `NGINX_PORT` in your `.env` file.
 
-By default, Feedarium uses SQLite for simplicity. If you prefer PostgreSQL:
+#### With PostgreSQL
 
-1. **Update your .env file**
+Pass the `--pgsql` flag to include the PostgreSQL service:
+
+```bash
+./dev build --pgsql
+```
+
+Then update your `.env` file to use PostgreSQL:
 
 ```env
 DB_CONNECTION=pgsql
+DB_HOST=pgsql
+DB_PORT=5432
 DB_DATABASE=feedarium
 DB_USERNAME=laravel
 DB_PASSWORD=secret
 ```
 
-2. **Start the Docker environment with PostgreSQL**
+#### With MeiliSearch
+
+Pass the `--meilisearch` flag to include the MeiliSearch service:
 
 ```bash
-docker-compose up -d
+./dev build --meilisearch
 ```
+
+Then set the Scout driver in your `.env` file:
+
+```env
+SCOUT_DRIVER=meilisearch
+MEILISEARCH_HOST=http://meilisearch:7700
+MEILISEARCH_KEY=masterKey
+```
+
+Flags can be combined:
+
+```bash
+./dev build --pgsql --meilisearch
+```
+
+### Managing the Docker environment
+
+| Command | Description |
+|---|---|
+| `./dev up` | Start all containers (add `--pgsql` / `--meilisearch` as needed) |
+| `./dev down` | Stop and remove all containers |
+| `./dev workspace` | Open a bash shell inside the `app` container |
 
 ### Traditional Installation (without Docker)
 
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/feedarium.git
+git clone https://github.com/kodorama/feedarium.git
 cd feedarium
 ```
 
@@ -156,27 +167,35 @@ Visit [http://localhost:8000](http://localhost:8000) in your browser.
 ### Starting the development environment
 
 ```bash
-docker-compose up -d
-docker-compose exec app npm run dev
+./dev up
 ```
+
+To open a shell inside the app container:
+
+```bash
+./dev workspace
+```
+
+All `artisan`, `composer`, and `npm` commands can be run from within that shell.
 
 ### Running tests
 
 ```bash
-docker-compose exec app php artisan test
+./dev workspace
+php artisan test --compact
 ```
 
 ### Code style
 
 ```bash
-docker-compose exec app composer run pint
+vendor/bin/pint --dirty
 ```
 
 ### Static analysis
 
 ```bash
-docker-compose exec app composer require --dev phpstan/phpstan
-docker-compose exec app ./vendor/bin/phpstan analyse
+composer require --dev phpstan/phpstan
+./vendor/bin/phpstan analyse
 ```
 
 ## Contributing
@@ -195,8 +214,8 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Support & Community
 
-- [GitHub Issues](https://github.com/yourusername/feedarium/issues) for bug reports and feature requests
-- [GitHub Discussions](https://github.com/yourusername/feedarium/discussions) for community support and ideas
+- [GitHub Issues](https://github.com/kodorama/feedarium/issues) for bug reports and feature requests
+- [GitHub Discussions](https://github.com/kodorama/feedarium/discussions) for community support and ideas
 
 ---
 

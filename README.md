@@ -1,6 +1,6 @@
 # Feedarium
 
-<p align="center">
+<p>
     <a href="https://github.com/kodorama/feedarium/releases"><img alt="Version" src="https://img.shields.io/github/v/release/kodorama/feedarium?color=success&label=version&sort=semver&style=flat-square"></a>
     <a href="https://github.com/kodorama/feedarium/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/kodorama/feedarium?style=flat-square"></a>
     <a href="https://github.com/kodorama/feedarium/issues"><img alt="Issues" src="https://img.shields.io/github/issues/kodorama/feedarium?style=flat-square"></a>
@@ -162,6 +162,206 @@ php artisan serve
 
 Visit [http://localhost:8000](http://localhost:8000) in your browser.
 
+---
+
+## Self-Hosting with Portainer, CasaOS, or any Docker host
+
+The GitHub Actions workflow automatically builds a **single, self-contained image** and
+pushes it to the GitHub Container Registry on every push to `main` and on every version
+tag (`v*.*.*`).
+
+The image bundles **nginx**, **PHP-FPM**, the **queue worker**, and the **task
+scheduler** in one container managed by supervisord.  You do not need to clone the
+repository — just paste one of the compose snippets below.
+
+### What happens on first start
+
+The container's entrypoint performs these steps automatically **before** supervisord
+starts the web server:
+
+1. Creates writable `storage/` and `bootstrap/cache/` directory scaffolding inside
+   any mounted volumes (Docker volumes start empty).
+2. Generates and persists `APP_KEY` to `storage/app_key` inside the storage volume if
+   `APP_KEY` is not set in the environment — the key survives container upgrades.
+3. Runs `php artisan migrate --force` (retries up to 15× to wait for slow-starting
+   databases).
+4. Runs `php artisan config:cache`, `route:cache`, and `view:cache` for production
+   performance.
+
+> **Tip:** set `APP_KEY` explicitly in your compose file once you have one.  Run the
+> command below to generate a key without starting a full stack:
+>
+> ```bash
+> docker run --rm ghcr.io/kodorama/feedarium:latest \
+>     php artisan key:generate --show
+> ```
+
+---
+
+### Option A — SQLite (simplest, good for personal use)
+
+```yaml
+services:
+  app:
+    image: ghcr.io/kodorama/feedarium:latest
+    restart: unless-stopped
+    ports:
+      - "8080:80"             # change the left-hand port to avoid conflicts
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ""             # paste the output of key:generate --show here
+      APP_URL: "http://YOUR_SERVER_IP:8080"
+      DB_CONNECTION: sqlite
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      SESSION_DRIVER: file
+    volumes:
+      - feedarium-storage:/var/www/html/storage   # logs, sessions, view cache
+      - feedarium-db:/var/www/html/database        # SQLite database file
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    volumes:
+      - feedarium-redis:/data
+
+volumes:
+  feedarium-storage:
+  feedarium-db:
+  feedarium-redis:
+```
+
+---
+
+### Option B — PostgreSQL (recommended for multi-user / heavier workloads)
+
+```yaml
+services:
+  app:
+    image: ghcr.io/kodorama/feedarium:latest
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ""             # paste the output of key:generate --show here
+      APP_URL: "http://YOUR_SERVER_IP:8080"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: feedarium
+      DB_USERNAME: feedarium
+      DB_PASSWORD: "change-me"
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+    volumes:
+      - feedarium-storage:/var/www/html/storage
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: feedarium
+      POSTGRES_USER: feedarium
+      POSTGRES_PASSWORD: "change-me"
+    volumes:
+      - feedarium-pgsql:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    volumes:
+      - feedarium-redis:/data
+
+volumes:
+  feedarium-storage:
+  feedarium-pgsql:
+  feedarium-redis:
+```
+
+---
+
+### Option C — Add MeiliSearch (full-text search)
+
+Append the `meilisearch` service to either compose file above and add the
+corresponding environment variables to the `app` service.
+
+**Additional service:**
+
+```yaml
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: "change-me-meilisearch-key"
+      MEILI_ENV: production
+    volumes:
+      - feedarium-meilisearch:/meili_data
+```
+
+**Additional `app` environment variables:**
+
+```yaml
+      SCOUT_DRIVER: meilisearch
+      MEILISEARCH_HOST: "http://meilisearch:7700"
+      MEILISEARCH_KEY: "change-me-meilisearch-key"
+```
+
+**Additional volume:**
+
+```yaml
+  feedarium-meilisearch:
+```
+
+After the stack is running, sync the MeiliSearch index settings once:
+
+```bash
+docker exec <app-container-name> php artisan scout:sync-index-settings
+```
+
+---
+
+### Upgrading
+
+Pull the new image and recreate the container.  The entrypoint will automatically
+run any new migrations.
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+---
+
+## CI / CD — GitHub Actions
+
+The workflow at `.github/workflows/docker-publish.yml` builds and pushes the image
+automatically.
+
+| Trigger | Image tags produced |
+|---|---|
+| Push to `main` / `master` | `:latest`, `:main` |
+| Push tag `v1.2.3` | `:1.2.3`, `:1.2`, `:1` |
+| Manual (`workflow_dispatch`) | same as branch push |
+
+Builds target **`linux/amd64`** and **`linux/arm64`** so the image runs on both
+x86 servers and ARM boards (Raspberry Pi, Odroid, etc.).
+
+No secrets need to be configured — the workflow uses the built-in
+`GITHUB_TOKEN` to authenticate with GHCR.
+
+---
+
 ## Development
 
 ### Starting the development environment
@@ -200,7 +400,7 @@ composer require --dev phpstan/phpstan
 
 ## Contributing
 
-Contributions are welcome and greatly appreciated! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
+Contributions are welcome and greatly appreciated!
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/amazing-feature`)
@@ -219,6 +419,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-<p align="center">
+<p>
   Made with ❤️ by the Feedarium community
 </p>

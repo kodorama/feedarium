@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# GitHub / CI
+.github
+
+# Dev dependencies (reinstalled inside the image)
+node_modules
+vendor
+
+# Pre-built assets (rebuilt by the Node stage)
+public/build
+public/hot
+
+# Environment files — configuration must come from docker compose `environment:`
+.env
+.env.*
+!.env.example
+
+# Runtime-generated files
+storage/logs/*.log
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+bootstrap/cache/*.php
+
+# Dev tooling
+.dockerignore
+docker/Dockerfile
+docker/nginx/default.conf
+docker-compose.yml
+dev
+AGENTS.md
+CHECKLIST.md
+*.test.js
+npm-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store
+

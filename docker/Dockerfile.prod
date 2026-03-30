@@ -1,0 +1,110 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1 – Build frontend assets
+# Uses Node so the final PHP image stays lean.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2 – Production image  (PHP-FPM + nginx + supervisord, all-in-one)
+#
+# Single image → users only need one container definition in their
+# Portainer / CasaOS compose file.  nginx, php-fpm, the queue worker, and the
+# task scheduler are all managed by supervisord.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM php:8.4-fpm-alpine AS production
+
+# ── System packages ───────────────────────────────────────────────────────────
+RUN apk add --no-cache \
+        bash \
+        nginx \
+        supervisor \
+        git \
+        curl \
+        libpng-dev \
+        libjpeg-turbo-dev \
+        libwebp-dev \
+        libxpm-dev \
+        freetype-dev \
+        icu-dev \
+        zlib-dev \
+        libzip-dev \
+        oniguruma-dev \
+        postgresql-dev \
+        sqlite-dev \
+        libxml2-dev \
+        g++ \
+        make \
+        autoconf \
+        gcc \
+        gmp-dev \
+        openssl-dev \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
+    && docker-php-ext-install -j$(nproc) \
+        gd intl pdo pdo_mysql pdo_pgsql pdo_sqlite \
+        zip bcmath opcache xml gmp \
+    && rm -rf /tmp/pear /var/cache/apk/*
+
+# ── Composer ──────────────────────────────────────────────────────────────────
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
+
+# ── Application source ────────────────────────────────────────────────────────
+WORKDIR /var/www/html
+
+COPY . .
+
+# Pull in the pre-built Vite assets from Stage 1
+COPY --from=frontend /app/public/build ./public/build
+
+# Install PHP dependencies (production only, optimised autoloader)
+RUN composer install \
+        --no-dev \
+        --optimize-autoloader \
+        --no-interaction \
+        --no-progress \
+    && composer clear-cache
+
+# ── Directory permissions ─────────────────────────────────────────────────────
+# storage/ and bootstrap/cache/ are writable by www-data (php-fpm user).
+# The entrypoint re-runs these mkdir/chmod commands because Docker volumes
+# start empty on first boot, overwriting what we set here.
+RUN mkdir -p \
+        storage/logs \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views \
+        bootstrap/cache \
+    && touch database/database.sqlite \
+    && chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html \
+    && chmod -R 775 storage bootstrap/cache database
+
+# ── nginx configuration ───────────────────────────────────────────────────────
+# Replace Alpine's default nginx.conf with our production config that proxies
+# PHP through localhost (same container, no separate app service needed).
+COPY docker/nginx/prod.conf /etc/nginx/nginx.conf
+
+# ── supervisord configuration ─────────────────────────────────────────────────
+COPY docker/supervisord.conf /etc/supervisord.conf
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+# Handles APP_KEY auto-generation, migrations, and config/route/view caching
+# before supervisord takes over.
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+

@@ -14,6 +14,7 @@ onMounted(async () => {
                     window.location.href = route('register');
                 }
             }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
             // Optionally handle error
         }

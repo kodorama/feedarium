@@ -78,21 +78,55 @@ Use the current repository structure before inventing new structure.
 
 ### Current top-level application domains
 
+The actual subdirectories that exist right now (not every domain has every folder):
+
 ```text
-app/Domains/
-  Category/
-  Feed/
-  News/
-  User/
+app/
+  Domains/
+    Category/
+      Controllers/   ← CategoryResource.php here is a stale Filament v2 artifact, ignore it
+      Jobs/
+      Requests/
+    Feed/
+      Controllers/   ← FeedResource.php here is a stale Filament v2 artifact, ignore it
+      Jobs/
+      Requests/
+      Support/       ← WebSubSignatureVerifier.php (stateless HMAC helper)
+    News/
+      Controllers/   ← NewsResource.php here is a stale Filament v2 artifact, ignore it
+      Jobs/
+      Requests/
+    User/
+      Controllers/
+      Jobs/
+      Requests/
+  Events/
+    FeedUpdated.php  ← broadcast via Reverb on the public 'feeds' channel
+  Filament/
+    Pages/           ← AdminSettings.php (Livewire page, password/theme/timezone)
+    Resources/       ← CategoryResource.php, FeedResource.php (Filament v5, autodiscovered)
+  Http/
+    Controllers/
+      Settings/      ← ProfileController, PasswordController (Inertia settings pages ONLY)
 ```
+
+> **Filament resources belong in `app/Filament/Resources/`**, not in domain Controller folders.
+> The `*Resource.php` files inside domain `Controllers/` folders are stale Filament v2 artifacts
+> and should be ignored or removed. All active Filament v5 work goes in `app/Filament/`.
+
+> **Settings controllers exception**: `app/Http/Controllers/Settings/` holds the Inertia
+> profile/password settings controllers. This is an intentional exception to the domain-first
+> structure because these are thin Inertia-only controllers with no business logic.
 
 ### Current stack and product rules
 
 - backend: Laravel 12 + PHP 8.4
 - public UI: Vue 3 + Inertia
-- admin/backoffice: Filament only
-- auth/API readiness: Laravel Sanctum
+- admin/backoffice: Filament v5 only (panel path: `/admin`)
+- auth/API readiness: Laravel Sanctum (cookie-based session for Inertia, token for pure API)
 - supported databases: SQLite and PostgreSQL
+- RSS/Atom parsing: SimplePie (`simplepie/simplepie`)
+- real-time: Laravel Reverb (WebSocket broadcasting)
 
 ---
 
@@ -257,6 +291,120 @@ Use:
 - concrete response types
 
 Avoid vague or untyped public interfaces unless Laravel requires them.
+
+---
+
+## Known architectural exceptions
+
+These patterns deviate from the non-negotiable rules by design. Do not "fix" them.
+
+### 1. WebSubCallbackController — multi-method, no auth
+
+`App\Domains\Feed\Controllers\WebSubCallbackController` handles both `GET` (hub verification)
+and `POST` (content push) on the same route. It has private helper methods in addition to
+`__invoke`. It is intentionally excluded from Sanctum auth because the hub must reach it
+publicly. Route: `Route::match(['GET', 'POST'], '/api/websub/callback/{feedId}', ...)`.
+
+### 2. SaveArticleJob — uses `DB::table()` instead of `Model::query()`
+
+`App\Domains\News\Jobs\SaveArticleJob` inserts into the `saved_articles` pivot table using
+`DB::table('saved_articles')->insertOrIgnore(...)`. Eloquent's `BelongsToMany::attach()` does
+not support `insertOrIgnore`; the raw query builder call is the approved approach here.
+
+### 3. Settings and Auth controllers live outside domain folders
+
+`app/Http/Controllers/Settings/ProfileController` and `PasswordController` are intentionally
+outside the domain structure. They are thin Inertia-only controllers (no business logic, no
+DB writes) and are shared infrastructure rather than a domain concern.
+
+`app/Http/Controllers/Auth/` contains standard Laravel starter kit auth controllers
+(login, register, password reset, email verification). These are also intentionally outside
+the domain structure — they are framework scaffolding. Routes for these live in `routes/auth.php`.
+
+---
+
+## Domain feature inventory
+
+Use this to understand what currently exists before adding new features.
+
+### Feed pipeline
+
+The feed refresh pipeline runs as follows:
+
+```
+Schedule (every 15 min)
+  └── RefreshAllFeedsJob        fans out one FetchFeedJob per active feed
+        └── FetchFeedJob        HTTP GET with ETag/If-Modified-Since caching
+              └── ImportFeedItemsJob   parses XML via SimplePie, deduplicates by guid/link
+                    ├── ScrapeArticleThumbnailJob  (queued) scrapes og:image per new item
+                    └── ScrapeArticleBodyJob       (queued, only if scrape_full_body=true)
+```
+
+Key behaviors:
+- `FetchFeedJob`: 3 tries, 60 s backoff; skips import on HTTP 304
+- `ImportFeedItemsJob`: deduplicates by `guid` OR `link` within the same feed
+- `ScrapeArticleBodyJob`: guarded by `config('feedarium.scrape_full_body', false)` — set `FEEDARIUM_SCRAPE_FULL_BODY=true` in `.env` to enable
+- All scraping jobs: 3 tries, 60 s backoff; log warnings on failure without crashing
+
+### WebSub (PubSubHubbub) integration
+
+Feeds with a `hub_url` can receive real-time push updates:
+
+1. After creating/updating a feed with `hub_url`, `SubscribeToHubJob` (queued) sends a subscription request to the hub, stores `websub_secret` and `websub_subscribed_at` on the feed.
+2. The hub calls back to `/api/websub/callback/{feedId}`:
+   - `GET` — echoes `hub.challenge` for subscription verification
+   - `POST` — verifies HMAC-SHA256 signature via `Feed\Support\WebSubSignatureVerifier`, then dispatches `ImportFeedItemsJob`
+3. After import, `BroadcastFeedUpdatedJob` fires `App\Events\FeedUpdated` over the public `feeds` Reverb channel.
+
+### Real-time broadcasting
+
+- Event: `App\Events\FeedUpdated` — implements `ShouldBroadcastNow`, broadcasts on `Channel('feeds')` with `['feed_id' => $feedId]`
+- Job: `BroadcastFeedUpdatedJob` — dispatches `FeedUpdated` via `Broadcast::event()`
+- Frontend: `resources/js/composables/useFeedNotifications.ts` — listens on `window.Echo.channel('feeds')` for `FeedUpdated`
+
+### Saved articles
+
+- Pivot table: `saved_articles` (`user_id`, `news_id`, `created_at`)
+- Relationships: `User::savedArticles()` BelongsToMany News; `News::savedByUsers()` BelongsToMany User
+- Jobs: `SaveArticleJob`, `UnsaveArticleJob`, `ListSavedArticlesJob`
+- Frontend composable: `resources/js/composables/useSavedArticles.ts` — `save(newsId)` / `unsave(newsId)` via axios
+
+### Admin panel (Filament v5)
+
+- Panel path: `/admin`
+- Autodiscovers resources from `app/Filament/Resources/` and pages from `app/Filament/Pages/`
+- Active resources: `CategoryResource`, `FeedResource`
+- Active pages: `AdminSettings` (password, theme, timezone settings via Livewire)
+- Access gate: `User::canAccessPanel()` checks `is_admin === true`
+
+---
+
+## Dev workflow
+
+### Starting the dev environment
+
+```bash
+composer run dev
+```
+
+This runs four processes concurrently: `php artisan serve`, `php artisan queue:listen --tries=1`, `php artisan pail --timeout=0`, and `npm run dev`.
+
+**The queue worker must be running** for any queued job to execute (feed fetching, scraping, WebSub subscription, broadcasting).
+
+### Running tests
+
+```bash
+php artisan test --compact
+php artisan test --compact --filter=FetchFeedJobTest
+```
+
+### Code formatting
+
+```bash
+vendor/bin/pint --dirty --format agent   # PHP (run after any PHP edit)
+npm run format                           # Prettier for resources/
+npm run lint                             # ESLint fix
+```
 
 ---
 
@@ -527,6 +675,62 @@ final class News extends Model
 ### Public UI
 
 The first-party reader UI uses Vue 3 + Inertia.
+
+#### Page structure
+
+Pages live in `resources/js/pages/` organized by domain:
+
+```text
+resources/js/pages/
+  auth/          ← Login, Register, RegisterAdmin, etc.
+  feeds/         ← Index.vue (main reader), Saved.vue
+  Feed/          ← Create.vue, Edit.vue, Index.vue
+  Category/      ← Create.vue, Edit.vue, Index.vue
+  User/          ← Create.vue, Edit.vue, Index.vue
+  settings/      ← Appearance.vue, Categories.vue, FeedSources.vue, Profile.vue, Password.vue
+  Dashboard.vue
+  Welcome.vue
+```
+
+#### Layouts
+
+- `resources/js/layouts/AppLayout.vue` — wraps `app/AppSidebarLayout.vue`; use this for all authenticated pages
+- `resources/js/layouts/AuthLayout.vue` — for auth pages
+- `resources/js/layouts/app/AppSidebarLayout.vue` — composes `AppShell`, `AppSidebar`, `AppContent`
+
+#### Components
+
+- Shared components: `resources/js/components/` (e.g. `AppHeader.vue`, `AppSidebar.vue`, `SearchBar.vue`)
+- UI primitives: `resources/js/components/ui/` — shadcn-vue-style components built on **reka-ui** (button, card, dialog, input, sidebar, etc.)
+- Icons: **lucide-vue-next** (`import { Rss, Bookmark } from 'lucide-vue-next'`)
+- Class merging utility: `resources/js/lib/utils.ts` exports `cn()` (clsx + tailwind-merge)
+
+#### Composables
+
+```text
+resources/js/composables/
+  useAppearance.ts        ← light/dark/system theme (cookie-persisted)
+  useFeedNotifications.ts ← Reverb/Echo listener for FeedUpdated events
+  useInitials.ts          ← derives initials from a name string
+  useSavedArticles.ts     ← save(newsId) / unsave(newsId) via axios
+```
+
+#### Internationalization
+
+- Setup: `resources/js/i18n/index.ts` bootstraps vue-i18n v11 with `legacy: false`
+- Locale files: `resources/js/i18n/locales/en.json`
+- Usage: `const { t } = useI18n()` in `<script setup>`
+
+#### TypeScript types
+
+- Shared types: `resources/js/types/index.d.ts` — `AppPageProps`, `Auth`, `User`, `NavItem`, `BreadcrumbItem`
+- Use `AppPageProps<T>` as the Inertia page props type
+
+#### HTTP calls from Vue
+
+- API calls from composables/pages use `axios` configured in `resources/js/lib/axios.ts` (withCredentials + XSRF-TOKEN)
+- Inertia form submissions use `useForm()` from `@inertiajs/vue3`
+- Route generation uses `route()` from `ziggy-js` / `ZiggyVue`
 
 ### Admin UI
 

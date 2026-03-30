@@ -2,10 +2,10 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import axios from 'axios';
-import { Pencil, Trash2, Plus, Tag } from 'lucide-vue-next';
+import { Pencil, Plus, Tag, Trash2 } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
@@ -71,9 +71,9 @@ onMounted(loadCategories);
             </div>
 
             <!-- Desktop table -->
-            <div v-else class="hidden sm:block overflow-x-auto rounded-xl border border-border">
+            <div v-else class="hidden overflow-x-auto rounded-xl border border-border sm:block">
                 <table class="w-full text-sm">
-                    <thead class="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                    <thead class="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
                         <tr>
                             <th class="px-4 py-3 text-left">{{ t('categories.name') }}</th>
                             <th class="px-4 py-3 text-left">{{ t('categories.description') }}</th>
@@ -129,4 +129,3 @@ onMounted(loadCategories);
         </div>
     </AppLayout>
 </template>
-

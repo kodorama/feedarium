@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import axios from 'axios';
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
 
 const { t } = useI18n();
 
@@ -60,21 +60,14 @@ function onBlur() {
             v-model="query"
             type="search"
             :placeholder="t('news.search_placeholder')"
-            class="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary sm:w-64"
+            class="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm focus:ring-2 focus:ring-primary focus:outline-none sm:w-64"
             @blur="onBlur"
             @focus="query.length >= 2 && (showDropdown = true)"
         />
-        <div
-            v-if="showDropdown && results.length > 0"
-            class="absolute right-0 top-10 z-50 w-80 rounded-xl border border-border bg-popover shadow-lg"
-        >
+        <div v-if="showDropdown && results.length > 0" class="absolute top-10 right-0 z-50 w-80 rounded-xl border border-border bg-popover shadow-lg">
             <ul class="max-h-72 overflow-y-auto py-1">
                 <li v-if="loading" class="px-4 py-2 text-sm text-muted-foreground">{{ t('general.loading') }}</li>
-                <li
-                    v-for="item in results"
-                    :key="item.id"
-                    class="px-4 py-2 hover:bg-accent"
-                >
+                <li v-for="item in results" :key="item.id" class="px-4 py-2 hover:bg-accent">
                     <a :href="item.link" target="_blank" rel="noopener noreferrer" class="block text-sm font-medium">
                         {{ item.title }}
                     </a>
@@ -87,4 +80,3 @@ function onBlur() {
         </div>
     </div>
 </template>
-

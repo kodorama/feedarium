@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import SettingsLayout from '@/layouts/settings/Layout.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/AppLayout.vue';
+import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Pencil, Trash2, Plus, X, Check, Tag } from 'lucide-vue-next';
+import { Check, Pencil, Plus, Tag, Trash2, X } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
@@ -194,7 +194,16 @@ onMounted(loadCategories);
                     </div>
                     <div class="flex gap-2">
                         <Button type="submit" size="sm" :disabled="saving">Save</Button>
-                        <Button type="button" size="sm" variant="ghost" @click="showAddForm = false; errors = {}">Cancel</Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            @click="
+                                showAddForm = false;
+                                errors = {};
+                            "
+                            >Cancel</Button
+                        >
                     </div>
                 </form>
 
@@ -218,19 +227,15 @@ onMounted(loadCategories);
                             </div>
                             <Input v-model="editForm.description" placeholder="Description (optional)" />
                             <div class="flex gap-2">
-                                <Button type="submit" size="sm" :disabled="saving">
-                                    <Check class="mr-1 h-4 w-4" /> Save
-                                </Button>
-                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit">
-                                    <X class="mr-1 h-4 w-4" /> Cancel
-                                </Button>
+                                <Button type="submit" size="sm" :disabled="saving"> <Check class="mr-1 h-4 w-4" /> Save </Button>
+                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit"> <X class="mr-1 h-4 w-4" /> Cancel </Button>
                             </div>
                         </form>
 
                         <!-- View mode -->
                         <div v-else class="flex items-center justify-between gap-4">
                             <div class="min-w-0">
-                                <p class="truncate font-medium text-sm">{{ cat.name }}</p>
+                                <p class="truncate text-sm font-medium">{{ cat.name }}</p>
                                 <p v-if="cat.description" class="truncate text-xs text-muted-foreground">{{ cat.description }}</p>
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
@@ -254,4 +259,3 @@ onMounted(loadCategories);
         </SettingsLayout>
     </AppLayout>
 </template>
-

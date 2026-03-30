@@ -15,6 +15,8 @@ final class SearchNewsRequest extends FormRequest
     {
         return [
             'q' => ['required', 'string', 'min:2', 'max:255'],
+            'feed_id' => ['sometimes', 'nullable', 'integer'],
+            'category_id' => ['sometimes', 'nullable', 'integer'],
         ];
     }
 }

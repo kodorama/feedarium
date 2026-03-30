@@ -27,7 +27,19 @@
         "remove_saved": "Remove from saved",
         "dark_mode": "Dark",
         "light_mode": "Light",
-        "system_mode": "System"
+        "system_mode": "System",
+        "previous": "Previous",
+        "next": "Next",
+        "mark_all_read": "Mark all as read",
+        "load_more": "Load more",
+        "show_unread_only": "Show unread only",
+        "show_all": "Show all",
+        "list_view": "List view",
+        "compact_view": "Compact view (no thumbnails)",
+        "grid_view": "Grid view",
+        "refresh": "Refresh",
+        "clear_search": "Clear search",
+        "columns": "columns"
     },
     "feeds": {
         "title": "Feeds",
@@ -46,6 +58,7 @@
     },
     "news": {
         "title": "Articles",
+        "all_articles": "All Articles",
         "saved_title": "Saved Articles",
         "no_saved": "You have no saved articles yet.",
         "search_placeholder": "Search articles…",
@@ -53,7 +66,15 @@
         "unsaved": "Article removed from saved list.",
         "read_article": "Read article",
         "published": "Published",
-        "by": "by"
+        "by": "by",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "unknown_date": "Unknown date",
+        "new_available": "New articles are available. Refresh to see them.",
+        "no_preview": "No preview available.",
+        "searching": "Searching…",
+        "search_results": "Search results",
+        "no_search_results": "No articles found for your search."
     },
     "categories": {
         "title": "Categories",
@@ -78,4 +99,3 @@
         "confirm_password": "Confirm Password"
     }
 }
-

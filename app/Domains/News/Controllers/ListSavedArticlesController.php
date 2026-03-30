@@ -3,19 +3,23 @@
 namespace App\Domains\News\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use App\Domains\News\Resources\NewsResource;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use App\Domains\News\Jobs\ListSavedArticlesJob;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 final class ListSavedArticlesController extends Controller
 {
     use DispatchesJobs;
 
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request): AnonymousResourceCollection
     {
-        $articles = $this->dispatchSync(new ListSavedArticlesJob($request->user()));
+        $paginator = $this->dispatchSync(new ListSavedArticlesJob(
+            user: $request->user(),
+            cursor: $request->string('cursor')->toString() ?: null,
+        ));
 
-        return response()->json($articles);
+        return NewsResource::collection($paginator);
     }
 }

@@ -2,9 +2,9 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
 
 const { t } = useI18n();
 
@@ -45,7 +45,9 @@ async function submit() {
     } catch (e: any) {
         if (e.response?.status === 422) {
             const errs = e.response.data.errors ?? {};
-            Object.keys(errs).forEach((k) => { errors.value[k] = errs[k][0]; });
+            Object.keys(errs).forEach((k) => {
+                errors.value[k] = errs[k][0];
+            });
         }
     } finally {
         submitting.value = false;
@@ -70,7 +72,7 @@ async function submit() {
                         v-model="form.name"
                         type="text"
                         required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                     <p v-if="errors.name" class="mt-1 text-xs text-destructive">{{ errors.name }}</p>
                 </div>
@@ -79,7 +81,7 @@ async function submit() {
                     <textarea
                         v-model="form.description"
                         rows="3"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                 </div>
                 <div class="flex items-center gap-3 pt-2">
@@ -96,4 +98,3 @@ async function submit() {
         </div>
     </AppLayout>
 </template>
-

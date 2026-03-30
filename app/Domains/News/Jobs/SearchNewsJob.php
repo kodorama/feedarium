@@ -2,32 +2,37 @@
 
 namespace App\Domains\News\Jobs;
 
+use App\Models\Feed;
 use App\Models\News;
+use Illuminate\Contracts\Pagination\Paginator;
 use App\Domains\News\Requests\SearchNewsRequest;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /**
- * Searches news by title and description using portable LIKE queries.
- * Sync job (no ShouldQueue) — returns paginated results.
+ * Searches news using Laravel Scout (MeiliSearch in production, database driver in tests).
+ * Fetches matching IDs from the search engine, then simple-paginates via Eloquent.
+ * Sync job (no ShouldQueue) — returns simple-paginated results.
  */
 final class SearchNewsJob
 {
-    public function __construct(
-        private readonly SearchNewsRequest $request,
-    ) {}
-
-    public function handle(): LengthAwarePaginator
+    public function handle(SearchNewsRequest $request): Paginator
     {
-        $q = $this->request->string('q')->toString();
-        $term = "%{$q}%";
+        $q = $request->string('q')->toString();
+        $feedId = $request->filled('feed_id')
+            ? $request->integer('feed_id')
+            : null;
+        $categoryId = $request->filled('category_id')
+            ? $request->integer('category_id')
+            : null;
 
-        return News::query()
-            ->with('feed')
-            ->where(function ($query) use ($term) {
-                $query->where('title', 'LIKE', $term)
-                    ->orWhere('description', 'LIKE', $term);
-            })
-            ->latest('published_at')
-            ->paginate(20);
+        $feedIds = ($feedId === null && $categoryId !== null)
+            ? Feed::query()->where('category_id', $categoryId)->pluck('id')->toArray()
+            : null;
+
+        return News::search($q)
+            ->when($feedId !== null, fn ($builder) => $builder->where('feed_id', $feedId))
+            ->when($feedIds !== null, fn ($builder) => $builder->whereIn('feed_id', $feedIds))
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->simplePaginate(20);
     }
 }

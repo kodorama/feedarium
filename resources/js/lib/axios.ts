@@ -10,4 +10,3 @@ const axios = axiosLib.create({
 });
 
 export default axios;
-

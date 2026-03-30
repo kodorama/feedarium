@@ -38,6 +38,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/feeds', function (Request $request) {
         return Inertia::render('feeds/Index', [
             'selectedFeedId' => $request->filled('feed_id') ? $request->integer('feed_id') : null,
+            'selectedCategoryId' => $request->filled('category_id') ? $request->integer('category_id') : null,
         ]);
     })->name('feeds.index');
 

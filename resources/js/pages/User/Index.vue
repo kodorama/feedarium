@@ -2,10 +2,10 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import axios from 'axios';
-import { Pencil, Trash2, Plus, Users } from 'lucide-vue-next';
+import { Pencil, Plus, Trash2, Users } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
@@ -71,9 +71,9 @@ onMounted(loadUsers);
             </div>
 
             <!-- Desktop table -->
-            <div v-else class="hidden sm:block overflow-x-auto rounded-xl border border-border">
+            <div v-else class="hidden overflow-x-auto rounded-xl border border-border sm:block">
                 <table class="w-full text-sm">
-                    <thead class="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                    <thead class="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
                         <tr>
                             <th class="px-4 py-3 text-left">{{ t('auth.name') }}</th>
                             <th class="px-4 py-3 text-left">{{ t('auth.email') }}</th>
@@ -86,7 +86,9 @@ onMounted(loadUsers);
                             <td class="px-4 py-3 font-medium">{{ user.name }}</td>
                             <td class="px-4 py-3 text-muted-foreground">{{ user.email }}</td>
                             <td class="px-4 py-3">
-                                <span v-if="user.is_admin" class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Admin</span>
+                                <span v-if="user.is_admin" class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                    >Admin</span
+                                >
                                 <span v-else class="text-muted-foreground">—</span>
                             </td>
                             <td class="px-4 py-3">
@@ -115,14 +117,20 @@ onMounted(loadUsers);
                         <div>
                             <p class="font-semibold">{{ user.name }}</p>
                             <p class="text-sm text-muted-foreground">{{ user.email }}</p>
-                            <span v-if="user.is_admin" class="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Admin</span>
+                            <span v-if="user.is_admin" class="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+                                >Admin</span
+                            >
                         </div>
                     </div>
                     <div class="mt-3 flex gap-3 border-t border-border pt-3">
                         <Link :href="`/users/${user.id}/edit`" class="flex items-center gap-1 text-sm text-primary hover:underline">
                             <Pencil class="h-4 w-4" /> {{ t('general.edit') }}
                         </Link>
-                        <button @click="deleteUser(user.id)" :disabled="deleting === user.id" class="flex items-center gap-1 text-sm text-destructive hover:underline">
+                        <button
+                            @click="deleteUser(user.id)"
+                            :disabled="deleting === user.id"
+                            class="flex items-center gap-1 text-sm text-destructive hover:underline"
+                        >
                             <Trash2 class="h-4 w-4" /> {{ t('general.delete') }}
                         </button>
                     </div>
@@ -131,4 +139,3 @@ onMounted(loadUsers);
         </div>
     </AppLayout>
 </template>
-

@@ -96,6 +96,7 @@ app/
       Controllers/   ← NewsResource.php here is a stale Filament v2 artifact, ignore it
       Jobs/
       Requests/
+      Resources/     ← NewsResource.php (active Laravel API Resource for all news endpoints)
     User/
       Controllers/
       Jobs/
@@ -109,6 +110,9 @@ app/
     Controllers/
       Settings/      ← ProfileController, PasswordController (Inertia settings pages ONLY)
 ```
+
+> **API Resources live in `app/Domains/<Domain>/Resources/`**. `NewsResource` (in `News/Resources/`)
+> shapes all news API output. Do not return raw Eloquent models from public endpoints.
 
 > **Filament resources belong in `app/Filament/Resources/`**, not in domain Controller folders.
 > The `*Resource.php` files inside domain `Controllers/` folders are stale Filament v2 artifacts
@@ -689,7 +693,6 @@ resources/js/pages/
   User/          ← Create.vue, Edit.vue, Index.vue
   settings/      ← Appearance.vue, Categories.vue, FeedSources.vue, Profile.vue, Password.vue
   Dashboard.vue
-  Welcome.vue
 ```
 
 #### Layouts

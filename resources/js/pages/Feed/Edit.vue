@@ -16,7 +16,7 @@
                         v-model="form.name"
                         type="text"
                         required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                     <p v-if="errors.name" class="mt-1 text-xs text-destructive">{{ errors.name }}</p>
                 </div>
@@ -28,7 +28,7 @@
                         v-model="form.url"
                         type="url"
                         required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                     <p v-if="errors.url" class="mt-1 text-xs text-destructive">{{ errors.url }}</p>
                 </div>
@@ -39,7 +39,7 @@
                     <textarea
                         v-model="form.description"
                         rows="3"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                 </div>
 
@@ -48,7 +48,7 @@
                     <label class="mb-1 block text-sm font-medium">{{ t('feeds.category') }}</label>
                     <select
                         v-model="form.category_id"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     >
                         <option value="">— None —</option>
                         <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
@@ -62,7 +62,7 @@
                         v-model="form.hub_url"
                         type="url"
                         placeholder="https://pubsubhubbub.appspot.com/"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                     />
                     <p v-if="errors.hub_url" class="mt-1 text-xs text-destructive">{{ errors.hub_url }}</p>
                 </div>
@@ -93,9 +93,9 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import axios from 'axios';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 

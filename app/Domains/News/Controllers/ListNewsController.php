@@ -4,18 +4,19 @@ namespace App\Domains\News\Controllers;
 
 use App\Models\News;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final class ListNewsController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request): LengthAwarePaginator
     {
-        $news = News::query()
-            ->with('feed')
-            ->latest('published_at')
-            ->get();
+        $perPage = $request->integer('per_page', 20);
 
-        return response()->json(['news' => $news]);
+        return News::query()
+            ->with('feed')
+            ->when($request->filled('feed_id'), fn ($q) => $q->where('feed_id', $request->integer('feed_id')))
+            ->latest('published_at')
+            ->paginate($perPage);
     }
 }

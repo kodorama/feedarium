@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Feed;
 use Inertia\Middleware;
+use App\Models\Category;
 use Tighten\Ziggy\Ziggy;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Inspiring;
@@ -52,6 +54,12 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'appearance' => $request->cookie('appearance', 'system'),
+            'sidebarCategories' => $request->user()
+                ? Category::query()->orderBy('name')->get(['id', 'name'])
+                : [],
+            'sidebarFeeds' => $request->user()
+                ? Feed::query()->where('active', true)->orderBy('name')->get(['id', 'name', 'category_id', 'favicon_url'])
+                : [],
         ];
     }
 }

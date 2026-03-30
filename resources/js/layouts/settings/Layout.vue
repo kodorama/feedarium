@@ -18,6 +18,14 @@ const sidebarNavItems: NavItem[] = [
         title: 'Appearance',
         href: '/settings/appearance',
     },
+    {
+        title: 'Categories',
+        href: '/settings/categories',
+    },
+    {
+        title: 'Feed Sources',
+        href: '/settings/feeds',
+    },
 ];
 
 const page = usePage();

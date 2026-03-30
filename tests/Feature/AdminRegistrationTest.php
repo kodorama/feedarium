@@ -10,7 +10,7 @@ describe('Admin Registration', function () {
     it('does not redirect to admin registration if users exist', function () {
         \App\Models\User::factory()->create(['is_admin' => true]);
         $response = $this->get('/');
-        $response->assertInertia(fn ($page) => $page->component('Welcome'));
+        $response->assertRedirect(route('login'));
     });
 
     it('registers an admin user via API', function () {

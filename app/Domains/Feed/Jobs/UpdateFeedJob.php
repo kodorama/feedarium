@@ -24,14 +24,23 @@ final class UpdateFeedJob
         $feed = Feed::query()->findOrFail($this->id);
 
         $oldHubUrl = $feed->hub_url;
+        $oldUrl = $feed->url;
 
+        $newUrl = $this->request->string('url')->toString();
         $newHubUrl = $this->request->filled('hub_url')
             ? $this->request->string('hub_url')->toString()
             : null;
 
+        // Recompute favicon when the URL domain changes or favicon was never set
+        $faviconUrl = $feed->favicon_url;
+        if (! $faviconUrl || $newUrl !== $oldUrl) {
+            $host = parse_url($newUrl, PHP_URL_HOST) ?? '';
+            $faviconUrl = $host ? 'https://www.google.com/s2/favicons?domain='.urlencode($host).'&sz=32' : null;
+        }
+
         $feed->update([
             'name' => $this->request->string('name')->toString(),
-            'url' => $this->request->string('url')->toString(),
+            'url' => $newUrl,
             'description' => $this->request->filled('description')
                 ? $this->request->string('description')->toString()
                 : null,
@@ -40,6 +49,7 @@ final class UpdateFeedJob
                 ? $this->request->integer('category_id')
                 : null,
             'hub_url' => $newHubUrl,
+            'favicon_url' => $faviconUrl,
         ]);
 
         if ($newHubUrl && $newHubUrl !== $oldHubUrl) {

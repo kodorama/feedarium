@@ -58,7 +58,11 @@ class HandleInertiaRequests extends Middleware
                 ? Category::query()->orderBy('name')->get(['id', 'name'])
                 : [],
             'sidebarFeeds' => $request->user()
-                ? Feed::query()->where('active', true)->orderBy('name')->get(['id', 'name', 'category_id', 'favicon_url'])
+                ? Feed::query()
+                    ->where('active', true)
+                    ->withCount(['news as unread_count' => fn ($q) => $q->where('is_read', false)])
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'category_id', 'favicon_url'])
                 : [],
         ];
     }

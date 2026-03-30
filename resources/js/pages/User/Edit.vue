@@ -2,9 +2,9 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
 
 const { t } = useI18n();
 
@@ -51,7 +51,9 @@ async function submit() {
     } catch (e: any) {
         if (e.response?.status === 422) {
             const errs = e.response.data.errors ?? {};
-            Object.keys(errs).forEach((k) => { errors.value[k] = errs[k][0]; });
+            Object.keys(errs).forEach((k) => {
+                errors.value[k] = errs[k][0];
+            });
         }
     } finally {
         submitting.value = false;
@@ -72,20 +74,33 @@ async function submit() {
             <form @submit.prevent="submit" class="space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm">
                 <div>
                     <label class="mb-1 block text-sm font-medium">{{ t('auth.name') }} *</label>
-                    <input v-model="form.name" type="text" required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                    <input
+                        v-model="form.name"
+                        type="text"
+                        required
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
                     <p v-if="errors.name" class="mt-1 text-xs text-destructive">{{ errors.name }}</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium">{{ t('auth.email') }} *</label>
-                    <input v-model="form.email" type="email" required
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                    <input
+                        v-model="form.email"
+                        type="email"
+                        required
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
                     <p v-if="errors.email" class="mt-1 text-xs text-destructive">{{ errors.email }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium">New Password <span class="text-muted-foreground">(leave blank to keep)</span></label>
-                    <input v-model="form.password" type="password"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                    <label class="mb-1 block text-sm font-medium"
+                        >New Password <span class="text-muted-foreground">(leave blank to keep)</span></label
+                    >
+                    <input
+                        v-model="form.password"
+                        type="password"
+                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                    />
                     <p v-if="errors.password" class="mt-1 text-xs text-destructive">{{ errors.password }}</p>
                 </div>
                 <div class="flex items-center gap-3">
@@ -93,8 +108,11 @@ async function submit() {
                     <label for="is_admin" class="text-sm font-medium">Admin</label>
                 </div>
                 <div class="flex items-center gap-3 pt-2">
-                    <button type="submit" :disabled="submitting"
-                        class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+                    <button
+                        type="submit"
+                        :disabled="submitting"
+                        class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                    >
                         {{ submitting ? t('general.loading') : t('general.update') }}
                     </button>
                     <Link href="/users" class="text-sm text-muted-foreground hover:underline">{{ t('general.cancel') }}</Link>
@@ -103,4 +121,3 @@ async function submit() {
         </div>
     </AppLayout>
 </template>
-

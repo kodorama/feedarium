@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
-import AppLayout from '@/layouts/AppLayout.vue';
-import SettingsLayout from '@/layouts/settings/Layout.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/AppLayout.vue';
+import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
-import { Pencil, Trash2, Plus, X, Check, Rss, ToggleLeft, ToggleRight } from 'lucide-vue-next';
+import { Check, Pencil, Plus, Rss, ToggleLeft, ToggleRight, Trash2, X } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
@@ -67,10 +67,7 @@ function showToast(type: Toast['type'], message: string) {
 async function loadData() {
     loading.value = true;
     try {
-        const [feedsRes, catsRes] = await Promise.all([
-            axios.get('/api/feeds'),
-            axios.get('/api/categories'),
-        ]);
+        const [feedsRes, catsRes] = await Promise.all([axios.get('/api/feeds'), axios.get('/api/categories')]);
         // APIs return { feeds: [...] } and { categories: [...] }
         feeds.value = feedsRes.data.feeds ?? feedsRes.data.data ?? feedsRes.data;
         categories.value = catsRes.data.categories ?? catsRes.data.data ?? catsRes.data;
@@ -260,7 +257,16 @@ onMounted(loadData);
                     </div>
                     <div class="flex gap-2">
                         <Button type="submit" size="sm" :disabled="saving">Save</Button>
-                        <Button type="button" size="sm" variant="ghost" @click="showAddForm = false; errors = {}">Cancel</Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            @click="
+                                showAddForm = false;
+                                errors = {};
+                            "
+                            >Cancel</Button
+                        >
                     </div>
                 </form>
 
@@ -286,31 +292,24 @@ onMounted(loadData);
                                 <Input v-model="editForm.url" type="url" placeholder="Feed URL" required />
                                 <p v-if="errors.edit_url" class="text-xs text-destructive">{{ errors.edit_url }}</p>
                             </div>
-                            <select
-                                v-model="editForm.category_id"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            >
+                            <select v-model="editForm.category_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                                 <option value="">— None —</option>
                                 <option v-for="cat in categories" :key="cat.id" :value="String(cat.id)">{{ cat.name }}</option>
                             </select>
                             <Input v-model="editForm.description" placeholder="Description (optional)" />
                             <div class="flex items-center gap-2">
                                 <input id="edit-active" type="checkbox" v-model="editForm.active" class="h-4 w-4" />
-                                <Label for="edit-active" class="font-normal text-sm">Active</Label>
+                                <Label for="edit-active" class="text-sm font-normal">Active</Label>
                             </div>
                             <div class="flex gap-2">
-                                <Button type="submit" size="sm" :disabled="saving">
-                                    <Check class="mr-1 h-4 w-4" /> Save
-                                </Button>
-                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit">
-                                    <X class="mr-1 h-4 w-4" /> Cancel
-                                </Button>
+                                <Button type="submit" size="sm" :disabled="saving"> <Check class="mr-1 h-4 w-4" /> Save </Button>
+                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit"> <X class="mr-1 h-4 w-4" /> Cancel </Button>
                             </div>
                         </form>
 
                         <!-- View mode -->
                         <div v-else class="flex items-center justify-between gap-4">
-                            <div class="min-w-0 flex items-center gap-3">
+                            <div class="flex min-w-0 items-center gap-3">
                                 <img
                                     v-if="feed.favicon_url"
                                     :src="feed.favicon_url"
@@ -321,7 +320,7 @@ onMounted(loadData);
                                 />
                                 <Rss v-else class="h-4 w-4 shrink-0 text-muted-foreground" />
                                 <div class="min-w-0">
-                                    <p class="truncate font-medium text-sm">{{ feed.name }}</p>
+                                    <p class="truncate text-sm font-medium">{{ feed.name }}</p>
                                     <p class="truncate text-xs text-muted-foreground">
                                         {{ feed.category?.name ?? 'Uncategorized' }} · {{ feed.url }}
                                     </p>
@@ -357,4 +356,3 @@ onMounted(loadData);
         </SettingsLayout>
     </AppLayout>
 </template>
-

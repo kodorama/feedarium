@@ -2,10 +2,10 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
 import axios from 'axios';
-import { Pencil, Trash2, ToggleLeft, ToggleRight, Plus, Rss } from 'lucide-vue-next';
+import { Pencil, Plus, Rss, ToggleLeft, ToggleRight, Trash2 } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
@@ -94,9 +94,9 @@ onMounted(loadFeeds);
             </div>
 
             <!-- Desktop table -->
-            <div v-else class="hidden sm:block overflow-x-auto rounded-xl border border-border">
+            <div v-else class="hidden overflow-x-auto rounded-xl border border-border sm:block">
                 <table class="w-full text-sm">
-                    <thead class="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
+                    <thead class="bg-muted/50 text-xs tracking-wide text-muted-foreground uppercase">
                         <tr>
                             <th class="px-4 py-3 text-left">{{ t('feeds.name') }}</th>
                             <th class="px-4 py-3 text-left">{{ t('feeds.url') }}</th>
@@ -109,7 +109,7 @@ onMounted(loadFeeds);
                         <tr v-for="feed in feeds" :key="feed.id" class="hover:bg-muted/30">
                             <td class="px-4 py-3 font-medium">{{ feed.name }}</td>
                             <td class="max-w-xs px-4 py-3">
-                                <a :href="feed.url" target="_blank" rel="noopener noreferrer" class="truncate text-primary hover:underline block">
+                                <a :href="feed.url" target="_blank" rel="noopener noreferrer" class="block truncate text-primary hover:underline">
                                     {{ feed.url }}
                                 </a>
                             </td>
@@ -146,11 +146,7 @@ onMounted(loadFeeds);
 
             <!-- Mobile cards -->
             <ul v-if="feeds.length > 0" class="space-y-3 sm:hidden">
-                <li
-                    v-for="feed in feeds"
-                    :key="feed.id"
-                    class="rounded-xl border border-border bg-card p-4 shadow-sm"
-                >
+                <li v-for="feed in feeds" :key="feed.id" class="rounded-xl border border-border bg-card p-4 shadow-sm">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <p class="font-semibold">{{ feed.name }}</p>

@@ -3,19 +3,27 @@
 set -e
 
 COMMAND="$1"
-OPTION="$2"
+shift || true
 APP_CONTAINER="app"
-USE_PGSQL=""
-if [ "$OPTION" = "--pgsql" ]; then
-  USE_PGSQL="--profile pgsql"
-fi
+PROFILES=""
+
+for ARG in "$@"; do
+  case "$ARG" in
+    --pgsql)
+      PROFILES="$PROFILES --profile pgsql"
+      ;;
+    --meilisearch)
+      PROFILES="$PROFILES --profile meilisearch"
+      ;;
+  esac
+done
 
 case "$COMMAND" in
   build)
     echo "Setting up environment..."
     cp -n .env.example .env || echo ".env already exists."
-    docker compose $USE_PGSQL build
-    docker compose $USE_PGSQL up -d
+    docker compose $PROFILES build
+    docker compose $PROFILES up -d
     docker compose exec $APP_CONTAINER composer install
     docker compose exec $APP_CONTAINER php artisan key:generate
     docker compose exec $APP_CONTAINER npm install
@@ -24,18 +32,18 @@ case "$COMMAND" in
     ;;
   up)
     echo "Starting containers..."
-    docker compose $USE_PGSQL up -d
+    docker compose $PROFILES up -d
     ;;
   down)
     echo "Stopping containers..."
-    docker compose $USE_PGSQL down
+    docker compose $PROFILES down
     ;;
   workspace)
     echo "Accessing app container..."
     docker compose exec $APP_CONTAINER bash -i
     ;;
   *)
-    echo "Usage: $0 {build|up|down|workspace} [--pgsql]"
+    echo "Usage: $0 {build|up|down|workspace} [--pgsql] [--meilisearch]"
     exit 1
     ;;
 esac

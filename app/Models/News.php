@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Laravel\Scout\Searchable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 final class News extends Model
 {
     use HasFactory;
+    use Searchable;
 
     protected $fillable = [
         'feed_id',
@@ -47,6 +49,25 @@ final class News extends Model
         return [
             'published_at' => 'datetime',
             'is_read' => 'boolean',
+        ];
+    }
+
+    public function searchableAs(): string
+    {
+        return 'news';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'feed_id' => (int) $this->feed_id,
+            'title' => $this->title,
+            'description' => $this->description ? strip_tags($this->description) : null,
+            'author' => $this->author,
+            'published_at' => $this->published_at?->timestamp,
         ];
     }
 

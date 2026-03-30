@@ -83,8 +83,22 @@ services:
             - feedarium
         profiles: ["pgsql"]
 
+    meilisearch:
+        image: getmeili/meilisearch:v1.8
+        environment:
+            - MEILI_MASTER_KEY=${MEILISEARCH_KEY:-masterKey}
+            - MEILI_ENV=development
+        ports:
+            - "${MEILISEARCH_PORT:-7700}:7700"
+        volumes:
+            - feedarium-meilisearch:/meili_data
+        networks:
+            - feedarium
+        profiles: ["meilisearch"]
+
 networks:
     feedarium:
 
 volumes:
     feedarium-pgsql:
+    feedarium-meilisearch:

@@ -1,19 +1,17 @@
 <script setup lang="ts">
+import { useSavedArticles } from '@/composables/useSavedArticles';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useSavedArticles } from '@/composables/useSavedArticles';
 import axios from 'axios';
-import { Bookmark, BookmarkCheck, Rss, ExternalLink } from 'lucide-vue-next';
+import { Bookmark, BookmarkCheck, ExternalLink, Rss } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const { save, unsave, isSaving } = useSavedArticles();
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: t('nav.dashboard'), href: '/dashboard' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: t('nav.dashboard'), href: '/dashboard' }];
 
 interface Feed {
     id: number;
@@ -41,10 +39,7 @@ const loading = ref(true);
 
 onMounted(async () => {
     try {
-        const [feedRes, newsRes] = await Promise.all([
-            axios.get('/api/feeds'),
-            axios.get('/api/news', { params: { per_page: 20 } }),
-        ]);
+        const [feedRes, newsRes] = await Promise.all([axios.get('/api/feeds'), axios.get('/api/news', { params: { per_page: 20 } })]);
         feeds.value = feedRes.data.data ?? feedRes.data;
         articles.value = newsRes.data.data ?? newsRes.data;
     } catch {
@@ -72,16 +67,16 @@ async function toggleSave(article: Article) {
             <!-- Stats row -->
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div class="rounded-xl border border-border bg-card p-4 shadow-sm">
-                    <p class="text-xs text-muted-foreground uppercase tracking-wide">{{ t('feeds.title') }}</p>
+                    <p class="text-xs tracking-wide text-muted-foreground uppercase">{{ t('feeds.title') }}</p>
                     <p class="mt-1 text-2xl font-bold">{{ feeds.length }}</p>
                 </div>
                 <div class="rounded-xl border border-border bg-card p-4 shadow-sm">
-                    <p class="text-xs text-muted-foreground uppercase tracking-wide">{{ t('news.title') }}</p>
+                    <p class="text-xs tracking-wide text-muted-foreground uppercase">{{ t('news.title') }}</p>
                     <p class="mt-1 text-2xl font-bold">{{ articles.length }}</p>
                 </div>
                 <div class="col-span-2 rounded-xl border border-border bg-card p-4 shadow-sm sm:col-span-1">
-                    <p class="text-xs text-muted-foreground uppercase tracking-wide">Active Feeds</p>
-                    <p class="mt-1 text-2xl font-bold">{{ feeds.filter(f => f.active).length }}</p>
+                    <p class="text-xs tracking-wide text-muted-foreground uppercase">Active Feeds</p>
+                    <p class="mt-1 text-2xl font-bold">{{ feeds.filter((f) => f.active).length }}</p>
                 </div>
             </div>
 
@@ -107,12 +102,12 @@ async function toggleSave(article: Article) {
                                 :alt="article.title"
                                 class="h-16 w-24 flex-shrink-0 rounded-lg object-cover"
                             />
-                            <div class="flex flex-1 flex-col gap-1 min-w-0">
+                            <div class="flex min-w-0 flex-1 flex-col gap-1">
                                 <a
                                     :href="article.link"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="truncate font-medium leading-snug hover:underline"
+                                    class="truncate leading-snug font-medium hover:underline"
                                 >
                                     {{ article.title }}
                                 </a>
@@ -127,7 +122,7 @@ async function toggleSave(article: Article) {
                                     <button
                                         @click="toggleSave(article)"
                                         :disabled="isSaving(article.id)"
-                                        class="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                                        class="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
                                         :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')"
                                     >
                                         <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
@@ -167,7 +162,10 @@ async function toggleSave(article: Article) {
                                 <ExternalLink class="h-3 w-3 text-muted-foreground hover:text-foreground" />
                             </a>
                         </li>
-                        <li v-if="feeds.length === 0" class="rounded-lg border border-border bg-card px-3 py-4 text-center text-sm text-muted-foreground">
+                        <li
+                            v-if="feeds.length === 0"
+                            class="rounded-lg border border-border bg-card px-3 py-4 text-center text-sm text-muted-foreground"
+                        >
                             <Link href="/feeds/create" class="text-primary hover:underline">{{ t('feeds.create') }}</Link>
                         </li>
                     </ul>

@@ -22,7 +22,8 @@ Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vu
 
 ## Screenshots
 
-*Coming soon*
+![Screen Recording 2026-03-31 at 02 37 42](https://github.com/user-attachments/assets/6d488036-ef16-413e-85de-80f05ddbb293)
+
 
 ## Requirements
 

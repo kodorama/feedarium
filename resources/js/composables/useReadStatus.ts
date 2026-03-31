@@ -69,14 +69,33 @@ export function useReadStatus() {
 
     /** Returns adjusted unread count: 0 if mark-all was triggered, otherwise serverCount minus local read delta. */
     function adjustedFeedCount(feedId: number, serverCount: number): number {
-        if (_zeroedFeeds.value.has(feedId)) return 0;
+        if (_zeroedFeeds.value.has(feedId)) {
+            if (serverCount === 0) {
+                // Server has caught up — remove so new items are shown correctly
+                _zeroedFeeds.value.delete(feedId);
+                triggerRef(_zeroedFeeds);
+            }
+            return 0;
+        }
         return Math.max(0, serverCount - (_feedReadDelta.value.get(feedId) ?? 0));
     }
 
     /** Mark a feed's unread count as zero (called after mark-all-read for that feed). */
     function zeroFeedUnread(feedId: number): void {
         _zeroedFeeds.value.add(feedId);
+        clearFeedDelta(feedId);
         triggerRef(_zeroedFeeds);
+    }
+
+    /** Mark multiple feeds' unread counts as zero in one batched update. */
+    function zeroFeedsUnread(feedIds: number[]): void {
+        for (const id of feedIds) {
+            _zeroedFeeds.value.add(id);
+            _feedReadDelta.value.delete(id); // batch: skip per-item triggerRef
+        }
+        // Trigger refs once for the whole batch instead of per-feed
+        triggerRef(_zeroedFeeds);
+        triggerRef(_feedReadDelta);
     }
 
     /** Zero out the delta for a feed (after mark-all). */
@@ -98,6 +117,7 @@ export function useReadStatus() {
         markAllAsRead,
         adjustedFeedCount,
         zeroFeedUnread,
+        zeroFeedsUnread,
         clearFeedDelta,
     };
 }

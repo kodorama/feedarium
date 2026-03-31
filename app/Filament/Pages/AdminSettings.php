@@ -107,7 +107,12 @@ final class AdminSettings extends Page
 
     public function scoutSyncSettings(): void
     {
-        Artisan::call('scout:sync-index-settings', ['--no-interaction' => true]);
-        Notification::make()->title('Search index settings synced')->success()->send();
+        try {
+            Artisan::queue('scout:sync-index-settings', ['--no-interaction' => true]);
+            Notification::make()->title('Search index settings sync queued')->success()->send();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Scout sync-index-settings queue failed', ['exception' => $e->getMessage()]);
+            Notification::make()->title('Failed to queue search index settings sync')->danger()->send();
+        }
     }
 }

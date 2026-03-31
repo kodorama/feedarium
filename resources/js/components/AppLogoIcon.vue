@@ -13,5 +13,5 @@ defineProps<Props>();
 </script>
 
 <template>
-    <img src="/favicon-96x96.png" :class="className" v-bind="$attrs" />
+    <img src="/favicon-96x96.png" alt="" aria-hidden="true" class="h-full w-full object-contain" :class="className" v-bind="$attrs" />
 </template>

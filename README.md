@@ -8,7 +8,7 @@
 </p>
 
 ## About Feedarium
-
+<p><i>Feed + Diarium (Latin for `diary / newspaper` )</i></p>
 Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vue.js. It allows you to subscribe to your favorite websites and blogs, organizing all your reading in one beautiful, distraction-free interface.
 
 ### Key Features

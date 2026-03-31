@@ -1,12 +1,8 @@
 name: Build & Push Docker Image
 
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - "v*.*.*"
+  release:
+    types: [published]
   workflow_dispatch:
 
 env:
@@ -41,20 +37,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Generates tags:
-      #   branch push  → ghcr.io/owner/feedarium:main (or :master)
-      #   tag v1.2.3   → ghcr.io/owner/feedarium:1.2.3, :1.2, :1
-      #   default branch push → also tags :latest
+      #   release v1.2.3 → ghcr.io/owner/feedarium:1.2.3, :1.2, :1, :latest
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6

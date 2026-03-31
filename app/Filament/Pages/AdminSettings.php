@@ -4,8 +4,11 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Artisan;
 use Filament\Notifications\Notification;
 use Illuminate\Validation\Rules\Password;
+use App\Domains\News\Jobs\FlushScoutIndexJob;
+use App\Domains\News\Jobs\ImportScoutIndexJob;
 use App\Domains\User\Jobs\UpdateAdminPasswordJob;
 
 final class AdminSettings extends Page
@@ -88,5 +91,23 @@ final class AdminSettings extends Page
         $this->password_confirmation = '';
 
         Notification::make()->title('Password updated successfully')->success()->send();
+    }
+
+    public function scoutFlush(): void
+    {
+        dispatch(new FlushScoutIndexJob);
+        Notification::make()->title('Search index flush queued')->success()->send();
+    }
+
+    public function scoutImport(): void
+    {
+        dispatch(new ImportScoutIndexJob);
+        Notification::make()->title('Search index import queued')->success()->send();
+    }
+
+    public function scoutSyncSettings(): void
+    {
+        Artisan::call('scout:sync-index-settings', ['--no-interaction' => true]);
+        Notification::make()->title('Search index settings synced')->success()->send();
     }
 }

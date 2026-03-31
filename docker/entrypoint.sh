@@ -57,7 +57,14 @@ php artisan route:cache   --no-interaction
 echo "[entrypoint] Caching views..."
 php artisan view:cache    --no-interaction
 
-# ── 5. Hand off to supervisord (nginx + php-fpm + queue + scheduler) ──────────
+# ── 5. Sync Scout index settings when using MeiliSearch ───────────────────────
+if [ "${SCOUT_DRIVER}" = "meilisearch" ]; then
+    echo "[entrypoint] Syncing MeiliSearch index settings..."
+    php artisan scout:sync-index-settings --no-interaction \
+        || echo "[entrypoint] Warning: scout:sync-index-settings failed – continuing."
+fi
+
+# ── 6. Hand off to supervisord (nginx + php-fpm + queue + scheduler) ──────────
 echo "[entrypoint] Starting services..."
 exec "$@"
 

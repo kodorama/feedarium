@@ -30,7 +30,7 @@ axios.interceptors.request.use((config) => {
     return config;
 });
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'Feedarium';
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

@@ -18,7 +18,7 @@ Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vu
 - **Article Filtering & Search**: Quickly find the content you're looking for.
 - **Reading Experience**: Comfortable reading view with adjustable text size and theme options.
 - **Mobile Friendly**: Responsive design that works on all your devices.
-- **Self-Hosted**: Own your data and reading habits by hosting Feedarium on your own server.
+- [**Self-Hosted**](#self-hosting-with-portainer-casaos-or-any-docker-host): Own your data and reading habits by hosting Feedarium on your own server.
 
 ## Screenshots
 
@@ -193,6 +193,9 @@ starts the web server:
 > **Variable substitution:** all environment values use `${VAR:-default}` syntax.
 > In Portainer, CasaOS, or a `.env` file next to your `compose.yml`, set only the
 > variables you want to override — everything else falls back to the shown defaults.
+<img width="1565" height="661" alt="image" src="https://github.com/user-attachments/assets/0ab0e51d-4083-4fb2-b62f-df409150f212" />
+
+>
 >
 > **`APP_KEY`** has no default and must be set explicitly.  Generate one with:
 >

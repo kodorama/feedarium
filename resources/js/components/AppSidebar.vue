@@ -22,7 +22,7 @@ import AppLogo from './AppLogo.vue';
 
 const { t } = useI18n();
 const page = usePage();
-const { adjustedFeedCount, feedReadDelta, zeroedFeeds, markAllAsRead, markAllSignal, zeroFeedUnread } = useReadStatus();
+const { adjustedFeedCount, feedReadDelta, zeroedFeeds, markAllAsRead, markAllSignal, zeroFeedUnread, zeroFeedsUnread } = useReadStatus();
 
 interface SidebarCategory {
     id: number;
@@ -123,9 +123,7 @@ function selectCategory(categoryId: number) {
 async function markAllForCategory(e: Event, categoryId: number): Promise<void> {
     e.stopPropagation();
     await markAllAsRead({ categoryId });
-    for (const feed of feedsByCategory.value.get(categoryId) ?? []) {
-        zeroFeedUnread(feed.id);
-    }
+    zeroFeedsUnread((feedsByCategory.value.get(categoryId) ?? []).map((f) => f.id));
 }
 
 async function markAllForFeed(e: Event, feedId: number): Promise<void> {
@@ -140,14 +138,10 @@ watch(markAllSignal, (sig) => {
     if (sig.feedId != null) {
         zeroFeedUnread(sig.feedId);
     } else if (sig.categoryId != null) {
-        for (const feed of feedsByCategory.value.get(sig.categoryId) ?? []) {
-            zeroFeedUnread(feed.id);
-        }
+        zeroFeedsUnread((feedsByCategory.value.get(sig.categoryId) ?? []).map((f) => f.id));
     } else {
         // No filter — mark all feeds as read
-        for (const feed of sidebarFeeds.value) {
-            zeroFeedUnread(feed.id);
-        }
+        zeroFeedsUnread(sidebarFeeds.value.map((f) => f.id));
     }
 });
 </script>

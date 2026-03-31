@@ -110,7 +110,7 @@
                     @if(config('scout.driver') === 'meilisearch')
                     <x-filament::button wire:click="scoutSyncSettings" color="gray" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="scoutSyncSettings">Sync Index Settings</span>
-                        <span wire:loading wire:target="scoutSyncSettings">Syncing…</span>
+                        <span wire:loading wire:target="scoutSyncSettings">Dispatching…</span>
                     </x-filament::button>
                     @endif
                 </div>

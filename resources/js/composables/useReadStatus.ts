@@ -13,6 +13,8 @@ const _readIds = ref(new Set<number>());
 const _markAllSignal = ref<(MarkAllParams & { nonce: number }) | null>(null);
 /** feedId → number of articles marked read this session (for badge decrement) */
 const _feedReadDelta = ref(new Map<number, number>());
+/** feedIds where mark-all-read has been triggered — sidebar shows 0 for these */
+const _zeroedFeeds = ref(new Set<number>());
 
 // ---------------------------------------------------------------------------
 
@@ -65,9 +67,16 @@ export function useReadStatus() {
         _markAllSignal.value = { ...params, nonce: Date.now() };
     }
 
-    /** Returns adjusted unread count: serverCount minus local read delta for that feed. */
+    /** Returns adjusted unread count: 0 if mark-all was triggered, otherwise serverCount minus local read delta. */
     function adjustedFeedCount(feedId: number, serverCount: number): number {
+        if (_zeroedFeeds.value.has(feedId)) return 0;
         return Math.max(0, serverCount - (_feedReadDelta.value.get(feedId) ?? 0));
+    }
+
+    /** Mark a feed's unread count as zero (called after mark-all-read for that feed). */
+    function zeroFeedUnread(feedId: number): void {
+        _zeroedFeeds.value.add(feedId);
+        triggerRef(_zeroedFeeds);
     }
 
     /** Zero out the delta for a feed (after mark-all). */
@@ -79,6 +88,7 @@ export function useReadStatus() {
     return {
         readIds: _readIds,
         feedReadDelta: _feedReadDelta,
+        zeroedFeeds: _zeroedFeeds,
         markAllSignal: _markAllSignal,
         isRead,
         addRead,
@@ -87,6 +97,7 @@ export function useReadStatus() {
         markAsRead,
         markAllAsRead,
         adjustedFeedCount,
+        zeroFeedUnread,
         clearFeedDelta,
     };
 }

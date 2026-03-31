@@ -16,13 +16,13 @@ import {
 import { useReadStatus } from '@/composables/useReadStatus';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { Bookmark, CheckCheck, ChevronRight, FolderOpen, LogOut, Rss, Settings } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppLogo from './AppLogo.vue';
 
 const { t } = useI18n();
 const page = usePage();
-const { adjustedFeedCount, feedReadDelta, markAllAsRead, clearFeedDelta } = useReadStatus();
+const { adjustedFeedCount, feedReadDelta, zeroedFeeds, markAllAsRead, markAllSignal, zeroFeedUnread } = useReadStatus();
 
 interface SidebarCategory {
     id: number;
@@ -65,8 +65,9 @@ function feedUnread(feed: SidebarFeed): number {
 
 /** Summed unread count for a category */
 const categoryUnread = computed(() => {
-    // feedReadDelta is referenced to make this reactive
+    // feedReadDelta and zeroedFeeds are referenced explicitly to ensure reactivity
     void feedReadDelta.value;
+    void zeroedFeeds.value;
     const map = new Map<number, number>();
     for (const feed of sidebarFeeds.value) {
         if (feed.category_id == null) continue;
@@ -122,17 +123,33 @@ function selectCategory(categoryId: number) {
 async function markAllForCategory(e: Event, categoryId: number): Promise<void> {
     e.stopPropagation();
     await markAllAsRead({ categoryId });
-    // Zero out deltas for all feeds in this category
     for (const feed of feedsByCategory.value.get(categoryId) ?? []) {
-        clearFeedDelta(feed.id);
+        zeroFeedUnread(feed.id);
     }
 }
 
 async function markAllForFeed(e: Event, feedId: number): Promise<void> {
     e.stopPropagation();
     await markAllAsRead({ feedId });
-    clearFeedDelta(feedId);
+    zeroFeedUnread(feedId);
 }
+
+// Handle mark-all triggered from the main toolbar (feeds/Index.vue) or anywhere else
+watch(markAllSignal, (sig) => {
+    if (!sig) return;
+    if (sig.feedId != null) {
+        zeroFeedUnread(sig.feedId);
+    } else if (sig.categoryId != null) {
+        for (const feed of feedsByCategory.value.get(sig.categoryId) ?? []) {
+            zeroFeedUnread(feed.id);
+        }
+    } else {
+        // No filter — mark all feeds as read
+        for (const feed of sidebarFeeds.value) {
+            zeroFeedUnread(feed.id);
+        }
+    }
+});
 </script>
 
 <template>

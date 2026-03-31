@@ -168,8 +168,7 @@ Visit [http://localhost:8000](http://localhost:8000) in your browser.
 ## Self-Hosting with Portainer, CasaOS, or any Docker host
 
 The GitHub Actions workflow automatically builds a **single, self-contained image** and
-pushes it to the GitHub Container Registry on every push to `main` and on every version
-tag (`v*.*.*`).
+pushes it to the GitHub Container Registry on every **published GitHub Release**.
 
 The image bundles **nginx**, **PHP-FPM**, the **queue worker**, and the **task
 scheduler** in one container managed by supervisord.  You do not need to clone the
@@ -188,9 +187,14 @@ starts the web server:
    databases).
 4. Runs `php artisan config:cache`, `route:cache`, and `view:cache` for production
    performance.
+5. When `SCOUT_DRIVER=meilisearch`, runs `php artisan scout:sync-index-settings`
+   to configure filterable and sortable attributes automatically.
 
-> **Tip:** set `APP_KEY` explicitly in your compose file once you have one.  Run the
-> command below to generate a key without starting a full stack:
+> **Variable substitution:** all environment values use `${VAR:-default}` syntax.
+> In Portainer, CasaOS, or a `.env` file next to your `compose.yml`, set only the
+> variables you want to override — everything else falls back to the shown defaults.
+>
+> **`APP_KEY`** has no default and must be set explicitly.  Generate one with:
 >
 > ```bash
 > docker run --rm ghcr.io/kodorama/feedarium:latest \
@@ -207,17 +211,12 @@ services:
     image: ghcr.io/kodorama/feedarium:latest
     restart: unless-stopped
     ports:
-      - "8080:80"             # change the left-hand port to avoid conflicts
+      - "${APP_PORT:-8080}:80"
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      APP_KEY: ""             # paste the output of key:generate --show here
-      APP_URL: "http://YOUR_SERVER_IP:8080"
-      DB_CONNECTION: sqlite
-      REDIS_HOST: redis
-      QUEUE_CONNECTION: redis
-      CACHE_STORE: redis
-      SESSION_DRIVER: file
+      APP_KEY: "${APP_KEY:-}"
+      APP_URL: "${APP_URL:-http://YOUR_SERVER_IP:8080}"
+      DB_CONNECTION: "${DB_CONNECTION:-sqlite}"
+      REDIS_HOST: "${REDIS_HOST:-redis}"
     volumes:
       - feedarium-storage:/var/www/html/storage   # logs, sessions, view cache
       - feedarium-db:/var/www/html/database        # SQLite database file
@@ -246,22 +245,17 @@ services:
     image: ghcr.io/kodorama/feedarium:latest
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${APP_PORT:-8080}:80"
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      APP_KEY: ""             # paste the output of key:generate --show here
-      APP_URL: "http://YOUR_SERVER_IP:8080"
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_DATABASE: feedarium
-      DB_USERNAME: feedarium
-      DB_PASSWORD: "change-me"
-      REDIS_HOST: redis
-      QUEUE_CONNECTION: redis
-      CACHE_STORE: redis
-      SESSION_DRIVER: redis
+      APP_KEY: "${APP_KEY:-}"
+      APP_URL: "${APP_URL:-http://YOUR_SERVER_IP:8080}"
+      DB_CONNECTION: "${DB_CONNECTION:-pgsql}"
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_DATABASE: "${DB_DATABASE:-feedarium}"
+      DB_USERNAME: "${DB_USERNAME:-feedarium}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-me}"
+      REDIS_HOST: "${REDIS_HOST:-redis}"
     volumes:
       - feedarium-storage:/var/www/html/storage
     depends_on:
@@ -272,9 +266,9 @@ services:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: feedarium
-      POSTGRES_USER: feedarium
-      POSTGRES_PASSWORD: "change-me"
+      POSTGRES_DB: "${DB_DATABASE:-feedarium}"
+      POSTGRES_USER: "${DB_USERNAME:-feedarium}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change-me}"
     volumes:
       - feedarium-pgsql:/var/lib/postgresql/data
 
@@ -304,7 +298,7 @@ corresponding environment variables to the `app` service.
     image: getmeili/meilisearch:v1.8
     restart: unless-stopped
     environment:
-      MEILI_MASTER_KEY: "change-me-meilisearch-key"
+      MEILI_MASTER_KEY: "${MEILISEARCH_KEY:-change-me-meilisearch-key}"
       MEILI_ENV: production
     volumes:
       - feedarium-meilisearch:/meili_data
@@ -313,9 +307,9 @@ corresponding environment variables to the `app` service.
 **Additional `app` environment variables:**
 
 ```yaml
-      SCOUT_DRIVER: meilisearch
-      MEILISEARCH_HOST: "http://meilisearch:7700"
-      MEILISEARCH_KEY: "change-me-meilisearch-key"
+      SCOUT_DRIVER: "${SCOUT_DRIVER:-meilisearch}"
+      MEILISEARCH_HOST: "${MEILISEARCH_HOST:-http://meilisearch:7700}"
+      MEILISEARCH_KEY: "${MEILISEARCH_KEY:-change-me-meilisearch-key}"
 ```
 
 **Additional volume:**
@@ -324,11 +318,77 @@ corresponding environment variables to the `app` service.
   feedarium-meilisearch:
 ```
 
-After the stack is running, sync the MeiliSearch index settings once:
+> MeiliSearch index settings are synced automatically on every container start.
+> You can also trigger a manual sync from the **Admin → Settings → Search Index** panel.
 
-```bash
-docker exec <app-container-name> php artisan scout:sync-index-settings
+---
+
+### Option D — PostgreSQL + MeiliSearch (full production stack)
+
+A single ready-to-paste compose file that combines Options B and C.
+
+```yaml
+services:
+  app:
+    image: ghcr.io/kodorama/feedarium:latest
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      APP_KEY: "${APP_KEY:-}"
+      APP_URL: "${APP_URL:-http://YOUR_SERVER_IP:8080}"
+      DB_CONNECTION: "${DB_CONNECTION:-pgsql}"
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_DATABASE: "${DB_DATABASE:-feedarium}"
+      DB_USERNAME: "${DB_USERNAME:-feedarium}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-me}"
+      REDIS_HOST: "${REDIS_HOST:-redis}"
+      SCOUT_DRIVER: "${SCOUT_DRIVER:-meilisearch}"
+      MEILISEARCH_HOST: "${MEILISEARCH_HOST:-http://meilisearch:7700}"
+      MEILISEARCH_KEY: "${MEILISEARCH_KEY:-change-me-meilisearch-key}"
+    volumes:
+      - feedarium-storage:/var/www/html/storage
+    depends_on:
+      - postgres
+      - redis
+      - meilisearch
+
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${DB_DATABASE:-feedarium}"
+      POSTGRES_USER: "${DB_USERNAME:-feedarium}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change-me}"
+    volumes:
+      - feedarium-pgsql:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    volumes:
+      - feedarium-redis:/data
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: "${MEILISEARCH_KEY:-change-me-meilisearch-key}"
+      MEILI_ENV: production
+    volumes:
+      - feedarium-meilisearch:/meili_data
+
+volumes:
+  feedarium-storage:
+  feedarium-pgsql:
+  feedarium-redis:
+  feedarium-meilisearch:
 ```
+
+> MeiliSearch index settings are synced automatically on every container start.
+> To import existing articles into the index after first deploy, use the
+> **Admin → Settings → Search Index → Import All Articles** button.
 
 ---
 
@@ -351,9 +411,8 @@ automatically.
 
 | Trigger | Image tags produced |
 |---|---|
-| Push to `main` / `master` | `:latest`, `:main` |
-| Push tag `v1.2.3` | `:1.2.3`, `:1.2`, `:1` |
-| Manual (`workflow_dispatch`) | same as branch push |
+| GitHub Release published (e.g. `v1.2.3`) | `:1.2.3`, `:1.2`, `:1`, `:latest` |
+| Manual (`workflow_dispatch`) | same as release |
 
 Builds target **`linux/amd64`** and **`linux/arm64`** so the image runs on both
 x86 servers and ARM boards (Raspberry Pi, Odroid, etc.).

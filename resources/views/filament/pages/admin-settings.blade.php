@@ -92,6 +92,31 @@
             </div>
         </x-filament::section>
 
+        {{-- Search Index --}}
+        <x-filament::section heading="Search Index">
+            <div class="space-y-4">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Manage the full-text search index for articles. All operations run in the background via the queue worker.
+                </p>
+                <div class="flex flex-wrap gap-3">
+                    <x-filament::button wire:click="scoutImport" color="primary" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="scoutImport">Import All Articles</span>
+                        <span wire:loading wire:target="scoutImport">Dispatching…</span>
+                    </x-filament::button>
+                    <x-filament::button wire:click="scoutFlush" color="warning" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="scoutFlush">Flush Index</span>
+                        <span wire:loading wire:target="scoutFlush">Dispatching…</span>
+                    </x-filament::button>
+                    @if(config('scout.driver') === 'meilisearch')
+                    <x-filament::button wire:click="scoutSyncSettings" color="gray" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="scoutSyncSettings">Sync Index Settings</span>
+                        <span wire:loading wire:target="scoutSyncSettings">Syncing…</span>
+                    </x-filament::button>
+                    @endif
+                </div>
+            </div>
+        </x-filament::section>
+
     </div>
 </x-filament-panels::page>
 

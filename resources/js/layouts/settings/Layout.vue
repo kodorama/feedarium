@@ -4,31 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-
-const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        href: '/settings/profile',
-    },
-    {
-        title: 'Password',
-        href: '/settings/password',
-    },
-    {
-        title: 'Appearance',
-        href: '/settings/appearance',
-    },
-    {
-        title: 'Categories',
-        href: '/settings/categories',
-    },
-    {
-        title: 'Feed Sources',
-        href: '/settings/feeds',
-    },
-];
+import { computed } from 'vue';
 
 const page = usePage();
+
+const isAdmin = computed(() => (page.props.auth?.user as any)?.is_admin === true);
+
+const baseNavItems: NavItem[] = [
+    { title: 'Profile', href: '/settings/profile' },
+    { title: 'Password', href: '/settings/password' },
+    { title: 'Appearance', href: '/settings/appearance' },
+    { title: 'Categories', href: '/settings/categories' },
+    { title: 'Feed Sources', href: '/settings/feeds' },
+];
+
+const sidebarNavItems = computed<NavItem[]>(() => [
+    ...baseNavItems,
+    ...(isAdmin.value ? [{ title: 'Search', href: '/settings/search' }] : []),
+]);
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
 </script>

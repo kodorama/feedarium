@@ -99,19 +99,16 @@
                     Manage the full-text search index for articles. All operations run in the background via the queue worker.
                 </p>
                 <div class="flex flex-wrap gap-3">
-                    <x-filament::button wire:click="scoutImport" color="primary" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="scoutImport">Import All Articles</span>
-                        <span wire:loading wire:target="scoutImport">Dispatching…</span>
+                    <x-filament::button wire:click="scoutImport" color="primary">
+                        Import All Articles
                     </x-filament::button>
-                    <x-filament::button wire:click="scoutFlush" color="warning" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="scoutFlush">Flush Index</span>
-                        <span wire:loading wire:target="scoutFlush">Dispatching…</span>
+                    <x-filament::button wire:click="scoutFlush" color="warning">
+                        Flush Index
                     </x-filament::button>
                     @if(config('scout.driver') === 'meilisearch')
-                    <x-filament::button wire:click="scoutSyncSettings" color="gray" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="scoutSyncSettings">Sync Index Settings</span>
-                        <span wire:loading wire:target="scoutSyncSettings">Dispatching…</span>
-                    </x-filament::button>
+                        <x-filament::button wire:click="scoutSyncSettings" color="gray">
+                            Sync Index Settings
+                        </x-filament::button>
                     @endif
                 </div>
             </div>

@@ -26,4 +26,10 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/feeds', function () {
         return Inertia::render('settings/FeedSources');
     })->name('settings.feeds');
+
+    Route::get('settings/search', function () {
+        return Inertia::render('settings/Search', [
+            'scoutDriver' => config('scout.driver'),
+        ]);
+    })->name('settings.search');
 });

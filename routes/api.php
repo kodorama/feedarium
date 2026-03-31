@@ -13,6 +13,7 @@ use App\Domains\Feed\Controllers\UpdateFeedController;
 use App\Domains\News\Controllers\CreateNewsController;
 use App\Domains\News\Controllers\DeleteNewsController;
 use App\Domains\News\Controllers\MarkAsReadController;
+use App\Domains\News\Controllers\ScoutFlushController;
 use App\Domains\News\Controllers\SearchNewsController;
 use App\Domains\News\Controllers\UpdateNewsController;
 use App\Domains\User\Controllers\CreateUserController;
@@ -20,11 +21,13 @@ use App\Domains\User\Controllers\DeleteUserController;
 use App\Domains\User\Controllers\UpdateUserController;
 use App\Domains\Feed\Controllers\SearchFeedsController;
 use App\Domains\News\Controllers\SaveArticleController;
+use App\Domains\News\Controllers\ScoutImportController;
 use App\Domains\News\Controllers\MarkAllAsReadController;
 use App\Domains\News\Controllers\UnsaveArticleController;
 use App\Domains\User\Controllers\RegisterAdminController;
 use App\Domains\Category\Controllers\ListCategoryController;
 use App\Domains\News\Controllers\ListSavedArticlesController;
+use App\Domains\News\Controllers\ScoutSyncSettingsController;
 use App\Domains\Category\Controllers\CreateCategoryController;
 use App\Domains\Category\Controllers\DeleteCategoryController;
 use App\Domains\Category\Controllers\UpdateCategoryController;
@@ -71,4 +74,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/users', CreateUserController::class);
     Route::put('/users/{id}', UpdateUserController::class);
     Route::delete('/users/{id}', DeleteUserController::class);
+
+    // Scout index management (admin only)
+    Route::post('/scout/import', ScoutImportController::class);
+    Route::post('/scout/flush', ScoutFlushController::class);
+    Route::post('/scout/sync-settings', ScoutSyncSettingsController::class);
 });

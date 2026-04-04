@@ -32,4 +32,8 @@ Route::middleware('auth')->group(function () {
             'scoutDriver' => config('scout.driver'),
         ]);
     })->name('settings.search');
+
+    Route::get('settings/reading', function () {
+        return Inertia::render('settings/Reading');
+    })->name('settings.reading');
 });

@@ -13,6 +13,7 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
+import { useAutoAdvance } from '@/composables/useAutoAdvance';
 import { useReadStatus } from '@/composables/useReadStatus';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { Bookmark, CheckCheck, ChevronRight, FolderOpen, LogOut, Rss, Settings } from 'lucide-vue-next';
@@ -23,6 +24,7 @@ import AppLogo from './AppLogo.vue';
 const { t } = useI18n();
 const page = usePage();
 const { adjustedFeedCount, feedReadDelta, zeroedFeeds, markAllAsRead, markAllSignal, zeroFeedUnread, zeroFeedsUnread } = useReadStatus();
+const { navigateToNextUnreadCategory } = useAutoAdvance();
 
 interface SidebarCategory {
     id: number;
@@ -124,6 +126,7 @@ async function markAllForCategory(e: Event, categoryId: number): Promise<void> {
     e.stopPropagation();
     await markAllAsRead({ categoryId });
     zeroFeedsUnread((feedsByCategory.value.get(categoryId) ?? []).map((f) => f.id));
+    navigateToNextUnreadCategory(categoryId, sidebarCategories.value, categoryUnread.value);
 }
 
 async function markAllForFeed(e: Event, feedId: number): Promise<void> {
@@ -139,6 +142,7 @@ watch(markAllSignal, (sig) => {
         zeroFeedUnread(sig.feedId);
     } else if (sig.categoryId != null) {
         zeroFeedsUnread((feedsByCategory.value.get(sig.categoryId) ?? []).map((f) => f.id));
+        navigateToNextUnreadCategory(sig.categoryId, sidebarCategories.value, categoryUnread.value);
     } else {
         // No filter — mark all feeds as read
         zeroFeedsUnread(sidebarFeeds.value.map((f) => f.id));

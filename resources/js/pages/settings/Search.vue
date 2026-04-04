@@ -107,9 +107,7 @@ async function syncSettings() {
 
                     <!-- Index operations -->
                     <div class="space-y-3">
-                        <p class="text-sm text-muted-foreground">
-                            All operations run in the background via the queue worker.
-                        </p>
+                        <p class="text-sm text-muted-foreground">All operations run in the background via the queue worker.</p>
 
                         <div class="flex flex-wrap gap-3">
                             <Button @click="importIndex" :disabled="importing">
@@ -128,12 +126,9 @@ async function syncSettings() {
                 </template>
 
                 <template v-else>
-                    <p class="text-sm text-muted-foreground">
-                        Search index management is available to administrators only.
-                    </p>
+                    <p class="text-sm text-muted-foreground">Search index management is available to administrators only.</p>
                 </template>
             </div>
         </SettingsLayout>
     </AppLayout>
 </template>
-

@@ -39,7 +39,14 @@
         "grid_view": "Grid view",
         "refresh": "Refresh",
         "clear_search": "Clear search",
-        "columns": "columns"
+        "columns": "columns",
+        "auto_advance": "Auto-advance to next category",
+        "auto_advance_desc": "Automatically move to the next unread category after marking a category as read. Falls back to All Articles when everything is read.",
+        "news_retention": "Article retention",
+        "news_retention_desc": "Automatically delete articles older than the specified number of days. Saved articles are never deleted.",
+        "news_retention_enabled": "Enable automatic article deletion",
+        "news_retention_days": "Delete articles older than (days)",
+        "save_retention_settings": "Save retention settings"
     },
     "feeds": {
         "title": "Feeds",

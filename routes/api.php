@@ -25,12 +25,14 @@ use App\Domains\News\Controllers\ScoutImportController;
 use App\Domains\News\Controllers\MarkAllAsReadController;
 use App\Domains\News\Controllers\UnsaveArticleController;
 use App\Domains\User\Controllers\RegisterAdminController;
+use App\Domains\Settings\Controllers\GetSettingsController;
 use App\Domains\Category\Controllers\ListCategoryController;
 use App\Domains\News\Controllers\ListSavedArticlesController;
 use App\Domains\News\Controllers\ScoutSyncSettingsController;
 use App\Domains\Category\Controllers\CreateCategoryController;
 use App\Domains\Category\Controllers\DeleteCategoryController;
 use App\Domains\Category\Controllers\UpdateCategoryController;
+use App\Domains\Settings\Controllers\UpdateSettingsController;
 
 // WebSub (PubSubHubbub) callbacks — no auth, hub must reach these
 Route::match(['GET', 'POST'], '/websub/callback/{feedId}', \App\Domains\Feed\Controllers\WebSubCallbackController::class);
@@ -79,4 +81,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/scout/import', ScoutImportController::class);
     Route::post('/scout/flush', ScoutFlushController::class);
     Route::post('/scout/sync-settings', ScoutSyncSettingsController::class);
+
+    // App settings (admin only)
+    Route::get('/settings', GetSettingsController::class);
+    Route::patch('/settings', UpdateSettingsController::class);
 });

@@ -2,7 +2,7 @@
 
 <p>
     <a href="https://github.com/kodorama/feedarium/releases"><img alt="Version" src="https://img.shields.io/github/v/release/kodorama/feedarium?color=success&label=version&sort=semver&style=flat-square"></a>
-    <a href="https://github.com/kodorama/feedarium/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/kodorama/feedarium?style=flat-square"></a>
+    <a href="https://github.com/kodorama/feedarium/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square"></a>
     <a href="https://github.com/kodorama/feedarium/issues"><img alt="Issues" src="https://img.shields.io/github/issues/kodorama/feedarium?style=flat-square"></a>
     <a href="https://github.com/kodorama/feedarium/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/kodorama/feedarium?style=flat-square"></a>
 </p>
@@ -414,7 +414,7 @@ automatically.
 
 | Trigger | Image tags produced |
 |---|---|
-| GitHub Release published (e.g. `v1.2.3`) | `:1.2.3`, `:1.2`, `:1`, `:latest` |
+| GitHub Release published (e.g. `v20260406`, `v20260406-1`) | `:20260406` / `:20260406-1`, `:latest` |
 | Manual (`workflow_dispatch`) | same as release |
 
 Builds target **`linux/amd64`** and **`linux/arm64`** so the image runs on both
@@ -473,7 +473,7 @@ Contributions are welcome and greatly appreciated!
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.html). See `LICENSE` for more information.
 
 ## Support & Community
 

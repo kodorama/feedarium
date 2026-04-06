@@ -385,7 +385,70 @@ Feeds with a `hub_url` can receive real-time push updates:
 
 ## Dev workflow
 
-### Starting the dev environment
+This project runs inside Docker. The local machine's PHP/Node environment may differ from the container environment. **Always run backend commands inside the Docker `app` container** to ensure consistency.
+
+### Starting the Docker environment
+
+```bash
+./dev up                  # start all containers (SQLite + Redis by default)
+./dev up --pgsql          # include PostgreSQL
+./dev up --meilisearch    # include MeiliSearch
+./dev up --pgsql --meilisearch  # full stack
+```
+
+To open a shell inside the `app` container:
+
+```bash
+./dev workspace
+```
+
+All `artisan`, `composer`, and `php` commands should be run from within that shell, or prefixed with `docker compose exec app`:
+
+```bash
+docker compose exec app php artisan migrate --force
+docker compose exec app php artisan tinker
+docker compose exec app composer install
+```
+
+**The queue worker runs automatically inside Docker** (managed by supervisord). You do not need to start it manually.
+
+### Running migrations
+
+Always run migrations inside the Docker `app` container, not locally:
+
+```bash
+docker compose exec app php artisan migrate --force
+docker compose exec app php artisan migrate:rollback --step=1 --force
+docker compose exec app php artisan migrate:status
+```
+
+> Running `php artisan migrate` locally against a local SQLite file while Docker uses PostgreSQL will produce schema mismatches. Always target the container.
+
+### Running tests
+
+```bash
+docker compose exec app php artisan test --compact
+docker compose exec app php artisan test --compact --filter=FetchFeedJobTest
+```
+
+### Code formatting
+
+PHP formatting runs locally via Pint (it only reads/writes files, no DB access):
+
+```bash
+vendor/bin/pint --dirty --format agent   # PHP (run after any PHP edit)
+```
+
+Frontend formatting also runs locally:
+
+```bash
+npm run format                           # Prettier for resources/
+npm run lint                             # ESLint fix
+```
+
+### Local-only (non-Docker) development
+
+If running without Docker:
 
 ```bash
 composer run dev
@@ -394,21 +457,6 @@ composer run dev
 This runs four processes concurrently: `php artisan serve`, `php artisan queue:listen --tries=1`, `php artisan pail --timeout=0`, and `npm run dev`.
 
 **The queue worker must be running** for any queued job to execute (feed fetching, scraping, WebSub subscription, broadcasting).
-
-### Running tests
-
-```bash
-php artisan test --compact
-php artisan test --compact --filter=FetchFeedJobTest
-```
-
-### Code formatting
-
-```bash
-vendor/bin/pint --dirty --format agent   # PHP (run after any PHP edit)
-npm run format                           # Prettier for resources/
-npm run lint                             # ESLint fix
-```
 
 ---
 

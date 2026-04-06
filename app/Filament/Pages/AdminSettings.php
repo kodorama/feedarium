@@ -4,11 +4,11 @@ namespace App\Filament\Pages;
 
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Artisan;
 use Filament\Notifications\Notification;
 use Illuminate\Validation\Rules\Password;
 use App\Domains\News\Jobs\FlushScoutIndexJob;
 use App\Domains\News\Jobs\ImportScoutIndexJob;
+use App\Domains\News\Jobs\SyncScoutSettingsJob;
 use App\Domains\User\Jobs\UpdateAdminPasswordJob;
 
 final class AdminSettings extends Page
@@ -107,12 +107,7 @@ final class AdminSettings extends Page
 
     public function scoutSyncSettings(): void
     {
-        try {
-            Artisan::queue('scout:sync-index-settings', ['--no-interaction' => true]);
-            Notification::make()->title('Search index settings sync queued')->success()->send();
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Scout sync-index-settings queue failed', ['exception' => $e->getMessage()]);
-            Notification::make()->title('Failed to queue search index settings sync')->danger()->send();
-        }
+        dispatch(new SyncScoutSettingsJob);
+        Notification::make()->title('Search index settings sync queued')->success()->send();
     }
 }

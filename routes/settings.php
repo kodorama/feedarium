@@ -36,4 +36,8 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/reading', function () {
         return Inertia::render('settings/Reading');
     })->name('settings.reading');
+
+    Route::get('settings/advanced', function () {
+        return Inertia::render('settings/Advanced');
+    })->name('settings.advanced');
 });

@@ -22,6 +22,7 @@ use App\Domains\User\Controllers\UpdateUserController;
 use App\Domains\Feed\Controllers\SearchFeedsController;
 use App\Domains\News\Controllers\SaveArticleController;
 use App\Domains\News\Controllers\ScoutImportController;
+use App\Domains\News\Controllers\ShowNewsBodyController;
 use App\Domains\News\Controllers\MarkAllAsReadController;
 use App\Domains\News\Controllers\UnsaveArticleController;
 use App\Domains\User\Controllers\RegisterAdminController;
@@ -61,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/news/search', SearchNewsController::class);
     Route::get('/news/saved', ListSavedArticlesController::class);
     Route::post('/news/read-all', MarkAllAsReadController::class);
+    Route::get('/news/{id}/body', ShowNewsBodyController::class);
     Route::post('/news/{id}/save', SaveArticleController::class);
     Route::delete('/news/{id}/save', UnsaveArticleController::class);
     Route::patch('/news/{id}/read', MarkAsReadController::class);

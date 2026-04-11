@@ -3,6 +3,7 @@
 use App\Models\Feed;
 use App\Models\News;
 use App\Models\User;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use App\Domains\News\Jobs\ScrapeArticleBodyJob;
 
@@ -12,8 +13,8 @@ describe('ScrapeArticleBodyJob', function () {
         $this->actingAs(User::first());
     });
 
-    it('stores full_body when scrape_full_body config is enabled', function () {
-        config(['feedarium.scrape_full_body' => true]);
+    it('stores full_body when scrape_full_body setting is enabled', function () {
+        Setting::set('scrape_full_body', 'true');
 
         $feed = Feed::factory()->create();
         $news = News::factory()->create(['feed_id' => $feed->id, 'link' => 'https://example.com/article']);
@@ -30,8 +31,8 @@ describe('ScrapeArticleBodyJob', function () {
         expect($news->fresh()->full_body)->toContain('This is the article content.');
     });
 
-    it('does not scrape when scrape_full_body config is disabled', function () {
-        config(['feedarium.scrape_full_body' => false]);
+    it('does not scrape when scrape_full_body setting is disabled', function () {
+        Setting::set('scrape_full_body', 'false');
 
         $feed = Feed::factory()->create();
         $news = News::factory()->create(['feed_id' => $feed->id, 'link' => 'https://example.com/article']);

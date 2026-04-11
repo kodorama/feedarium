@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { stripHtml, useArticleContent } from '@/composables/useArticleContent';
 import { useFeedNotifications } from '@/composables/useFeedNotifications';
+import { useFullBody } from '@/composables/useFullBody';
 import { useNewsSearch } from '@/composables/useNewsSearch';
 import { useReadStatus } from '@/composables/useReadStatus';
 import { useSavedArticles } from '@/composables/useSavedArticles';
@@ -11,6 +12,7 @@ import { Head, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import {
     AlignJustify,
+    BookOpen,
     Bookmark,
     BookmarkCheck,
     CheckCheck,
@@ -21,6 +23,7 @@ import {
     FileText,
     LayoutGrid,
     LayoutList,
+    Loader2,
     Mail,
     MailOpen,
     RefreshCw,
@@ -49,6 +52,7 @@ const {
 } = useNewsSearch();
 const { viewMode, gridColumns, gridClass } = useViewPreferences();
 const { rawMode, getArticleContent, hasContent } = useArticleContent();
+const { fetchFullBody, getCachedBody } = useFullBody();
 
 const isSearchMode = computed(() => searchQuery.value.length >= 2);
 
@@ -74,7 +78,6 @@ interface Article {
     link: string;
     description: string | null;
     thumbnail_url: string | null;
-    full_body: string | null;
     published_at: string | null;
     author: string | null;
     is_read: boolean;
@@ -264,6 +267,29 @@ async function refresh(): Promise<void> {
 // ---------------------------------------------------------------------------
 const readerIndex = computed(() => (readerArticle.value ? articles.value.findIndex((a) => a.id === readerArticle.value!.id) : -1));
 
+// Full body toggle state — resets on each new article
+const showFullBody = ref(false);
+const fullBodyContent = ref<string | null | undefined>(undefined);
+const loadingFullBody = ref(false);
+
+watch(readerArticle, (article) => {
+    showFullBody.value = false;
+    fullBodyContent.value = article ? getCachedBody(article.id) : undefined;
+});
+
+async function toggleFullBody(): Promise<void> {
+    if (!readerArticle.value) return;
+    showFullBody.value = !showFullBody.value;
+    if (showFullBody.value && fullBodyContent.value === undefined) {
+        loadingFullBody.value = true;
+        try {
+            fullBodyContent.value = await fetchFullBody(readerArticle.value.id);
+        } finally {
+            loadingFullBody.value = false;
+        }
+    }
+}
+
 function openReader(article: Article): void {
     readerArticle.value = article;
     markAsRead(article.id, article.feed.id);
@@ -283,6 +309,7 @@ function onKeyDown(e: KeyboardEvent): void {
     if (e.key === 'ArrowLeft') goToPrev();
     else if (e.key === 'ArrowRight') goToNext();
     else if (e.key === 'Escape') readerArticle.value = null;
+    else if (e.key === 'f' || e.key === 'F') toggleFullBody();
 }
 
 onMounted(() => {
@@ -796,6 +823,20 @@ watch(loadMoreBtn, (btn) => {
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
+                                <!-- Full body toggle -->
+                                <button
+                                    @click="toggleFullBody"
+                                    :class="[
+                                        'cursor-pointer rounded-lg p-1.5 transition-colors',
+                                        showFullBody
+                                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                                    ]"
+                                    :title="showFullBody ? t('news.switch_to_description') : t('news.switch_to_full_body')"
+                                >
+                                    <BookOpen class="h-4 w-4" />
+                                </button>
+                                <!-- Raw mode toggle -->
                                 <button
                                     @click="rawMode = !rawMode"
                                     :class="[
@@ -830,17 +871,40 @@ watch(loadMoreBtn, (btn) => {
                                 class="mb-4 max-h-56 w-full rounded-lg object-cover"
                                 @error="($event.target as HTMLImageElement).style.display = 'none'"
                             />
-                            <template v-if="hasContent(readerArticle)">
-                                <!-- eslint-disable vue/no-v-html -->
-                                <div v-if="!rawMode" class="prose prose-sm max-w-none dark:prose-invert" v-html="getArticleContent(readerArticle)" />
-                                <div
-                                    v-else
-                                    class="text-sm leading-relaxed whitespace-pre-wrap text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2"
-                                    v-html="getArticleContent(readerArticle)"
-                                />
-                                <!-- eslint-enable vue/no-v-html -->
+
+                            <!-- Full body view -->
+                            <template v-if="showFullBody">
+                                <div v-if="loadingFullBody" class="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Loader2 class="h-4 w-4 animate-spin" />
+                                    {{ t('news.loading_full_body') }}
+                                </div>
+                                <template v-else-if="hasContent(fullBodyContent ?? null)">
+                                    <!-- eslint-disable vue/no-v-html -->
+                                    <div v-if="!rawMode" class="prose prose-sm max-w-none dark:prose-invert" v-html="getArticleContent(fullBodyContent ?? null)" />
+                                    <div
+                                        v-else
+                                        class="text-sm leading-relaxed whitespace-pre-wrap text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2"
+                                        v-html="getArticleContent(fullBodyContent ?? null)"
+                                    />
+                                    <!-- eslint-enable vue/no-v-html -->
+                                </template>
+                                <p v-else class="text-sm text-muted-foreground">{{ t('news.no_full_body') }}</p>
                             </template>
-                            <p v-else class="text-sm text-muted-foreground">{{ t('news.no_preview') }}</p>
+
+                            <!-- Description view (default) -->
+                            <template v-else>
+                                <template v-if="hasContent(readerArticle.description)">
+                                    <!-- eslint-disable vue/no-v-html -->
+                                    <div v-if="!rawMode" class="prose prose-sm max-w-none dark:prose-invert" v-html="getArticleContent(readerArticle.description)" />
+                                    <div
+                                        v-else
+                                        class="text-sm leading-relaxed whitespace-pre-wrap text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2"
+                                        v-html="getArticleContent(readerArticle.description)"
+                                    />
+                                    <!-- eslint-enable vue/no-v-html -->
+                                </template>
+                                <p v-else class="text-sm text-muted-foreground">{{ t('news.no_preview') }}</p>
+                            </template>
                         </div>
 
                         <!-- Modal footer -->

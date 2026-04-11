@@ -15,5 +15,6 @@ final class UpdateSettingsJob
     {
         Setting::set('news_retention_enabled', $this->request->boolean('news_retention_enabled') ? 'true' : 'false');
         Setting::set('news_retention_days', (string) $this->request->integer('news_retention_days'));
+        Setting::set('scrape_full_body', $this->request->boolean('scrape_full_body') ? 'true' : 'false');
     }
 }

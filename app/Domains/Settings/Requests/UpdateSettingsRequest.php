@@ -19,6 +19,7 @@ final class UpdateSettingsRequest extends FormRequest
         return [
             'news_retention_enabled' => ['required', 'boolean'],
             'news_retention_days' => ['required', 'integer', 'min:1', 'max:3650'],
+            'scrape_full_body' => ['required', 'boolean'],
         ];
     }
 }

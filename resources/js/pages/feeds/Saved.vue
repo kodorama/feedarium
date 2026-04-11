@@ -345,7 +345,11 @@ onUnmounted(() => {
                             class="sticky top-0 flex items-start justify-between gap-4 rounded-t-xl border-b border-border bg-background/95 px-5 py-4 backdrop-blur-sm"
                         >
                             <div class="min-w-0">
-                                <h2 class="text-base leading-snug font-bold">{{ readerArticle.title }}</h2>
+                                <h2 class="text-base leading-snug font-bold">
+                                    <a :href="readerArticle.link" target="_blank" rel="noopener noreferrer" class="hover:underline">{{
+                                        readerArticle.title
+                                    }}</a>
+                                </h2>
                                 <div class="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
                                     <span class="flex items-center gap-1.5">
                                         <img

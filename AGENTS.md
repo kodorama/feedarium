@@ -48,7 +48,6 @@ Use this quick routing before making changes.
    - backend/domain behavior -> start in `app/Domains/<Domain>`
    - model/schema/data change -> inspect `app/Models` and `database/migrations`
    - public UI change -> inspect `resources/js` and related Inertia routes/controllers
-   - admin/backoffice change -> prefer Filament, not the public UI stack
    - API/output change -> inspect `routes/api.php`, Resources, and Sanctum implications
 
 2. **Does the task belong to an existing domain?**
@@ -126,7 +125,6 @@ app/
 
 - backend: Laravel 12 + PHP 8.4
 - public UI: Vue 3 + Inertia
-- admin/backoffice: Filament v5 only (panel path: `/admin`)
 - auth/API readiness: Laravel Sanctum (cookie-based session for Inertia, token for pure API)
 - supported databases: SQLite and PostgreSQL
 - RSS/Atom parsing: SimplePie (`simplepie/simplepie`)
@@ -373,13 +371,6 @@ Feeds with a `hub_url` can receive real-time push updates:
 - Jobs: `SaveArticleJob`, `UnsaveArticleJob`, `ListSavedArticlesJob`
 - Frontend composable: `resources/js/composables/useSavedArticles.ts` — `save(newsId)` / `unsave(newsId)` via axios
 
-### Admin panel (Filament v5)
-
-- Panel path: `/admin`
-- Autodiscovers resources from `app/Filament/Resources/` and pages from `app/Filament/Pages/`
-- Active resources: `CategoryResource`, `FeedResource`
-- Active pages: `AdminSettings` (password, theme, timezone settings via Livewire)
-- Access gate: `User::canAccessPanel()` checks `is_admin === true`
 
 ---
 
@@ -539,7 +530,6 @@ Do not place domain-specific behavior in generic global folders unless it is tru
 | Eloquent | Start from `Model::query()` | Call `Model::create()`, `Model::find()`, or `Model::where()` directly by default |
 | API output | Return Resources for stable public JSON | Return raw Eloquent models from public endpoints |
 | Structure | Reuse the nearest existing domain pattern | Invent a new folder or architecture style without need |
-| Admin vs public UI | Use Filament for admin workflows only | Build the public reader UI in Filament |
 | Types | Add explicit parameter, return, and relationship types | Leave public-facing code vague when a concrete type is available |
 
 ---
@@ -785,17 +775,7 @@ resources/js/composables/
 
 ### Admin UI
 
-Filament is for admin and backoffice workflows only.
-
-Use Filament for areas like:
-
-- feed management
-- categories
-- settings
-- moderation
-- diagnostics and import health
-
-Do not use Filament as the main public reader UI.
+Filament resources exist under `app/Filament/` but the admin panel is not actively used. Do not use Filament as the main public reader UI.
 
 ---
 
@@ -893,7 +873,6 @@ Do not introduce these patterns unless explicitly requested:
 - raw public API responses from unwrapped models
 - large untyped arrays passed around without structure
 - domain logic hidden in helpers or facades
-- placing the public reader UI into Filament
 
 ---
 

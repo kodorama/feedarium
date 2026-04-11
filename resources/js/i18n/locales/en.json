@@ -42,6 +42,9 @@
         "columns": "columns",
         "auto_advance": "Auto-advance to next category",
         "auto_advance_desc": "Automatically move to the next unread category after marking a category as read. Falls back to All Articles when everything is read.",
+        "plain_text_mode": "Plain text mode",
+        "plain_text_mode_label": "Default to plain text mode in article reader",
+        "plain_text_mode_desc": "Strip HTML formatting from articles by default. Images and links are preserved. You can still toggle formatting in any article modal.",
         "news_retention": "Article retention",
         "news_retention_desc": "Automatically delete articles older than the specified number of days. Saved articles are never deleted.",
         "news_retention_enabled": "Enable automatic article deletion",
@@ -81,7 +84,9 @@
         "no_preview": "No preview available.",
         "searching": "Searching…",
         "search_results": "Search results",
-        "no_search_results": "No articles found for your search."
+        "no_search_results": "No articles found for your search.",
+        "switch_to_raw": "Switch to plain text",
+        "switch_to_formatted": "Switch to formatted view"
     },
     "categories": {
         "title": "Categories",

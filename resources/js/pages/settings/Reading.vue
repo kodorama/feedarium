@@ -3,6 +3,7 @@ import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useArticleContent } from '@/composables/useArticleContent';
 import { useAutoAdvance } from '@/composables/useAutoAdvance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
@@ -16,6 +17,7 @@ import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 const page = usePage();
 const { autoAdvanceEnabled, setAutoAdvance } = useAutoAdvance();
+const { rawMode, setRawModeDefault } = useArticleContent();
 
 const isAdmin = computed(() => (page.props.auth?.user as any)?.is_admin === true);
 
@@ -117,6 +119,24 @@ onMounted(loadRetentionSettings);
                         />
                         <Label for="auto-advance" class="cursor-pointer font-normal">
                             {{ t('general.auto_advance') }}
+                        </Label>
+                    </div>
+                </div>
+
+                <!-- Plain text mode section -->
+                <div class="space-y-4 border-t border-border pt-6">
+                    <HeadingSmall :title="t('general.plain_text_mode')" :description="t('general.plain_text_mode_desc')" />
+
+                    <div class="flex items-center gap-3">
+                        <input
+                            id="plain-text-mode"
+                            type="checkbox"
+                            class="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+                            :checked="rawMode"
+                            @change="setRawModeDefault(($event.target as HTMLInputElement).checked)"
+                        />
+                        <Label for="plain-text-mode" class="cursor-pointer font-normal">
+                            {{ t('general.plain_text_mode_label') }}
                         </Label>
                     </div>
                 </div>

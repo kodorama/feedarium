@@ -17,9 +17,9 @@ final class UpdateSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'news_retention_enabled' => ['required', 'boolean'],
-            'news_retention_days' => ['required', 'integer', 'min:1', 'max:3650'],
-            'scrape_full_body' => ['required', 'boolean'],
+            'news_retention_enabled' => ['sometimes', 'boolean'],
+            'news_retention_days' => ['sometimes', 'integer', 'min:1', 'max:3650'],
+            'scrape_full_body' => ['sometimes', 'boolean'],
         ];
     }
 }

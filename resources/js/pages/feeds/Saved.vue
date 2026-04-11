@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { stripHtml, useArticleContent } from '@/composables/useArticleContent';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
-import { AlignJustify, Bookmark, BookmarkCheck, ExternalLink, LayoutGrid, LayoutList, Rss, X } from 'lucide-vue-next';
+import { AlignJustify, Bookmark, BookmarkCheck, Code2, ExternalLink, FileText, LayoutGrid, LayoutList, Rss, X } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
+
+const { rawMode, getArticleContent, hasContent } = useArticleContent();
 
 interface FeedMeta {
     id: number;
@@ -44,12 +47,6 @@ const hasMore = computed(() => nextCursor.value !== null);
 
 const readerArticle = ref<Article | null>(null);
 const readerIndex = computed(() => (readerArticle.value ? articles.value.findIndex((a) => a.id === readerArticle.value!.id) : -1));
-
-function stripHtml(html: string | null): string {
-    if (!html) return '';
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.body.textContent ?? '';
-}
 
 function formatDate(dateStr: string | null): string {
     if (!dateStr) return '';
@@ -366,9 +363,24 @@ onUnmounted(() => {
                                     <span v-if="readerArticle.author">{{ readerArticle.author }}</span>
                                 </div>
                             </div>
-                            <button @click="readerArticle = null" class="shrink-0 cursor-pointer rounded-lg p-1.5 hover:bg-muted">
-                                <X class="h-5 w-5" />
-                            </button>
+                            <div class="flex shrink-0 items-center gap-1">
+                                <button
+                                    @click="rawMode = !rawMode"
+                                    :class="[
+                                        'cursor-pointer rounded-lg p-1.5 transition-colors',
+                                        rawMode
+                                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                                    ]"
+                                    :title="rawMode ? t('news.switch_to_formatted') : t('news.switch_to_raw')"
+                                >
+                                    <Code2 v-if="rawMode" class="h-4 w-4" />
+                                    <FileText v-else class="h-4 w-4" />
+                                </button>
+                                <button @click="readerArticle = null" class="shrink-0 cursor-pointer rounded-lg p-1.5 hover:bg-muted">
+                                    <X class="h-5 w-5" />
+                                </button>
+                            </div>
                         </div>
                         <!-- Body -->
                         <div class="px-5 py-5">
@@ -381,13 +393,16 @@ onUnmounted(() => {
                                 class="mb-4 max-h-56 w-full rounded-lg object-cover"
                                 @error="($event.target as HTMLImageElement).style.display = 'none'"
                             />
-                            <!-- eslint-disable vue/no-v-html -->
-                            <div
-                                v-if="readerArticle.full_body"
-                                class="prose prose-sm max-w-none dark:prose-invert"
-                                v-html="readerArticle.full_body"
-                            />
-                            <p v-else-if="readerArticle.description" class="text-sm leading-relaxed">{{ stripHtml(readerArticle.description) }}</p>
+                            <template v-if="hasContent(readerArticle)">
+                                <!-- eslint-disable vue/no-v-html -->
+                                <div v-if="!rawMode" class="prose prose-sm max-w-none dark:prose-invert" v-html="getArticleContent(readerArticle)" />
+                                <div
+                                    v-else
+                                    class="text-sm leading-relaxed whitespace-pre-wrap text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2"
+                                    v-html="getArticleContent(readerArticle)"
+                                />
+                                <!-- eslint-enable vue/no-v-html -->
+                            </template>
                             <p v-else class="text-sm text-muted-foreground">{{ t('news.no_preview') }}</p>
                         </div>
                         <!-- Footer -->

@@ -188,13 +188,13 @@ export function getRawContent(html: string | null): string {
 }
 
 export function useArticleContent() {
-    function getArticleContent(article: { full_body: string | null; description: string | null }): string {
-        const content = article.full_body ?? article.description ?? '';
+    function getArticleContent(content: string | null): string {
+        if (!content) return '';
         return rawMode.value ? getRawContent(content) : processArticleHtml(content);
     }
 
-    function hasContent(article: { full_body: string | null; description: string | null }): boolean {
-        return !!(article.full_body || article.description);
+    function hasContent(content: string | null): boolean {
+        return !!content;
     }
 
     /** Persist the default raw-mode preference to localStorage and apply it immediately. */

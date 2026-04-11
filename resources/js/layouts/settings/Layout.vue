@@ -19,7 +19,10 @@ const baseNavItems: NavItem[] = [
     { title: 'Feed Sources', href: '/settings/feeds' },
 ];
 
-const sidebarNavItems = computed<NavItem[]>(() => [...baseNavItems, ...(isAdmin.value ? [{ title: 'Search', href: '/settings/search' }] : [])]);
+const sidebarNavItems = computed<NavItem[]>(() => [
+    ...baseNavItems,
+    ...(isAdmin.value ? [{ title: 'Search', href: '/settings/search' }, { title: 'Advanced', href: '/settings/advanced' }] : []),
+]);
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
 </script>

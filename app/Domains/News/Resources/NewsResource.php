@@ -18,7 +18,6 @@ final class NewsResource extends JsonResource
             'link' => $this->link,
             'description' => $this->description,
             'thumbnail_url' => $this->thumbnail_url,
-            'full_body' => $this->full_body,
             'published_at' => $this->published_at?->toIso8601String(),
             'author' => $this->author,
             'is_read' => (bool) $this->is_read,

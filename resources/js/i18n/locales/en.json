@@ -49,7 +49,13 @@
         "news_retention_desc": "Automatically delete articles older than the specified number of days. Saved articles are never deleted.",
         "news_retention_enabled": "Enable automatic article deletion",
         "news_retention_days": "Delete articles older than (days)",
-        "save_retention_settings": "Save retention settings"
+        "save_retention_settings": "Save Settings",
+        "save_settings": "Save Settings",
+        "save_settings_success": "Settings saved.",
+        "save_settings_error": "Failed to save settings.",
+        "scrape_full_body": "Full article scraping",
+        "scrape_full_body_label": "Fetch and store full article body",
+        "scrape_full_body_desc": "When enabled, Feedarium will fetch the complete article page for each new item and store it for in-app reading. This uses more bandwidth and storage. Requests are automatically rate-limited (5 per domain per minute) to avoid getting blocked."
     },
     "feeds": {
         "title": "Feeds",
@@ -86,7 +92,11 @@
         "search_results": "Search results",
         "no_search_results": "No articles found for your search.",
         "switch_to_raw": "Switch to plain text",
-        "switch_to_formatted": "Switch to formatted view"
+        "switch_to_formatted": "Switch to formatted view",
+        "switch_to_full_body": "View full article (F)",
+        "switch_to_description": "View summary (F)",
+        "loading_full_body": "Loading full article…",
+        "no_full_body": "No full article body available for this article."
     },
     "categories": {
         "title": "Categories",

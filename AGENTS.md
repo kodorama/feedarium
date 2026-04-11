@@ -418,8 +418,8 @@ docker compose exec app php artisan migrate:status
 ### Running tests
 
 ```bash
-docker compose exec app php artisan test --compact
-docker compose exec app php artisan test --compact --filter=FetchFeedJobTest
+php artisan test --compact
+php artisan test --compact --filter=FetchFeedJobTest
 ```
 
 ### Code formatting

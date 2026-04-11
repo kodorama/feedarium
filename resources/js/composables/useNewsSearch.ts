@@ -14,7 +14,6 @@ export interface SearchArticle {
     link: string;
     description: string | null;
     thumbnail_url: string | null;
-    full_body: string | null;
     published_at: string | null;
     author: string | null;
     is_read: boolean;

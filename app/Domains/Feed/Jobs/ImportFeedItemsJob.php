@@ -4,6 +4,7 @@ namespace App\Domains\Feed\Jobs;
 
 use App\Models\Feed;
 use App\Models\News;
+use App\Models\Setting;
 use SimplePie\SimplePie;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
@@ -39,6 +40,9 @@ final class ImportFeedItemsJob implements ShouldQueue
     public function handle(): void
     {
         $feed = Feed::query()->findOrFail($this->feedId);
+
+        // Read scrape setting once for the whole batch to avoid N queries.
+        $scrapeFullBody = Setting::get('scrape_full_body', 'false') === 'true';
 
         $simplepie = new SimplePie;
         $simplepie->set_raw_data($this->rawXml);
@@ -98,8 +102,8 @@ final class ImportFeedItemsJob implements ShouldQueue
                 ScrapeArticleThumbnailJob::dispatch($news->id);
             }
 
-            if (config('feedarium.scrape_full_body', false) && $link) {
-                \App\Domains\News\Jobs\ScrapeArticleBodyJob::dispatch($news->id);
+            if ($scrapeFullBody && $link) {
+                \App\Domains\News\Jobs\ScrapeArticleBodyJob::dispatch($news->id, $link);
             }
         }
     }

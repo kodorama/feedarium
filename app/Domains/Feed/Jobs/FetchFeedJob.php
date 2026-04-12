@@ -4,11 +4,13 @@ namespace App\Domains\Feed\Jobs;
 
 use App\Models\Feed;
 use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Http\Client\ConnectionException;
 
 /**
  * Fetches the raw RSS/Atom feed XML for a given Feed record.
@@ -20,6 +22,12 @@ use Illuminate\Foundation\Bus\Dispatchable;
  *  - Dispatching ImportFeedItemsJob with the raw feed content
  *
  * Queued so that fetching is non-blocking and retryable.
+ *
+ * HTTP note: some servers (e.g. makeuseof.com) run WAFs that silently drop TLS
+ * connections from unrecognised User-Agents — Guzzle's default UA triggers this,
+ * producing a misleading cURL error 56 ("unexpected eof while reading"). Sending
+ * a consistent Feedarium User-Agent and forcing HTTP/1.1 (the server's HTTP/2
+ * implementation is broken and returns PROTOCOL_ERROR) resolves both issues.
  */
 final class FetchFeedJob implements ShouldQueue
 {
@@ -45,9 +53,17 @@ final class FetchFeedJob implements ShouldQueue
             $headers['If-Modified-Since'] = $feed->last_modified_header;
         }
 
-        $response = Http::withHeaders($headers)
-            ->timeout(30)
-            ->get($feed->url);
+        try {
+            $response = Http::withHeaders($headers)
+                ->withUserAgent('Feedarium/1.0 (+https://github.com/kodorama/feedarium)')
+                ->timeout(30)
+                ->withOptions(['curl' => [CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1]])
+                ->get($feed->url);
+        } catch (ConnectionException $e) {
+            Log::warning("FetchFeedJob: connection error for feed {$this->feedId}: {$e->getMessage()}");
+
+            return;
+        }
 
         // 304 Not Modified — skip import, just update last_fetched_at
         if ($response->status() === 304) {

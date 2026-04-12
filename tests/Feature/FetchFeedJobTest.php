@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use App\Domains\Feed\Jobs\FetchFeedJob;
 use App\Domains\Feed\Jobs\ImportFeedItemsJob;
+use Illuminate\Http\Client\ConnectionException;
 
 describe('FetchFeedJob', function () {
     beforeEach(function () {
@@ -51,6 +52,18 @@ describe('FetchFeedJob', function () {
         ]);
 
         (new FetchFeedJob($feed->id))->handle();
+
+        Queue::assertNotPushed(ImportFeedItemsJob::class);
+    });
+
+    it('logs a warning and skips cleanly on connection error', function () {
+        $feed = Feed::factory()->create(['active' => true, 'url' => 'https://example.com/feed.xml']);
+
+        Http::fake([
+            '*' => static fn () => throw new ConnectionException('Simulated WAF drop / SSL EOF'),
+        ]);
+
+        expect(fn () => (new FetchFeedJob($feed->id))->handle())->not->toThrow(Exception::class);
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
     });

@@ -482,6 +482,16 @@ Distributed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](https:
 
 ---
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=kodorama%2Ffeedarium&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&legend=top-left" />
+ </picture>
+</a>
+
 <p>
   Made with ❤️ by the Feedarium community
 </p>

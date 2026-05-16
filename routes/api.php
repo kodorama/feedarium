@@ -23,6 +23,7 @@ use App\Domains\Feed\Controllers\SearchFeedsController;
 use App\Domains\News\Controllers\SaveArticleController;
 use App\Domains\News\Controllers\ScoutImportController;
 use App\Domains\News\Controllers\ShowNewsBodyController;
+use App\Domains\Feed\Controllers\CustomizeFeedController;
 use App\Domains\News\Controllers\MarkAllAsReadController;
 use App\Domains\News\Controllers\UnsaveArticleController;
 use App\Domains\User\Controllers\RegisterAdminController;
@@ -50,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/feeds/{id}', UpdateFeedController::class);
     Route::delete('/feeds/{id}', DeleteFeedController::class);
     Route::patch('/feeds/{id}/toggle', ToggleFeedController::class);
+    Route::patch('/feeds/{id}/customize', CustomizeFeedController::class);
 
     // Categories
     Route::get('/categories', ListCategoryController::class);

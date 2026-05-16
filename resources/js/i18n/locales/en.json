@@ -42,6 +42,9 @@
         "columns": "columns",
         "auto_advance": "Auto-advance to next category",
         "auto_advance_desc": "Automatically move to the next unread category after marking a category as read. Falls back to All Articles when everything is read.",
+        "customize": "Customize",
+        "feed_customize": "Customize Feed",
+        "feed_customize_saved": "Feed settings saved.",
         "plain_text_mode": "Plain text mode",
         "plain_text_mode_label": "Default to plain text mode in article reader",
         "plain_text_mode_desc": "Strip HTML formatting from articles by default. Images and links are preserved. You can still toggle formatting in any article modal.",
@@ -70,7 +73,14 @@
         "created": "Feed created successfully.",
         "updated": "Feed updated successfully.",
         "deleted": "Feed deleted successfully.",
-        "search_placeholder": "Search feeds…"
+        "search_placeholder": "Search feeds…",
+        "customize": "Customize",
+        "customize_title": "Customize Feed",
+        "customize_saved": "Feed settings saved.",
+        "disable_scraping_label": "Disable full article scraping for this feed",
+        "disable_scraping_desc": "Useful for feeds like Reddit where scraping the full article fails or returns irrelevant content. When enabled, this overrides the global scrape setting for this feed.",
+        "hide_image_label": "Hide article image in detail popup",
+        "hide_image_desc": "Images may still appear on article listing cards, but will be hidden inside the article detail popup for this feed."
     },
     "news": {
         "title": "Articles",

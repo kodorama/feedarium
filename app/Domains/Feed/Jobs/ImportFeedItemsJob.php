@@ -102,7 +102,7 @@ final class ImportFeedItemsJob implements ShouldQueue
                 ScrapeArticleThumbnailJob::dispatch($news->id);
             }
 
-            if ($scrapeFullBody && $link) {
+            if ($scrapeFullBody && $link && ! $feed->disable_full_article_scraping) {
                 \App\Domains\News\Jobs\ScrapeArticleBodyJob::dispatch($news->id, $link);
             }
         }

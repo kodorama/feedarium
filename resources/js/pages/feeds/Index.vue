@@ -7,9 +7,10 @@ import { useReadStatus } from '@/composables/useReadStatus';
 import { useSavedArticles } from '@/composables/useSavedArticles';
 import { useViewPreferences } from '@/composables/useViewPreferences';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
-import axios from 'axios';
+import axios from '@/lib/axios';
 import {
     AlignJustify,
     BookOpen,
@@ -29,6 +30,7 @@ import {
     RefreshCw,
     Rss,
     Search,
+    Settings2,
     X,
 } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -70,6 +72,7 @@ interface FeedMeta {
     id: number;
     name: string;
     favicon_url: string | null;
+    hide_image_in_detail?: boolean;
 }
 
 interface Article {
@@ -87,6 +90,8 @@ interface Article {
 interface SidebarEntry {
     id: number;
     name: string;
+    disable_full_article_scraping?: boolean;
+    hide_image_in_detail?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +112,48 @@ const selectedCategoryId = ref<number | null>(props.selectedCategoryId ?? null);
 
 // Sidebar data for title resolution
 const sidebarFeeds = computed(() => ((page.props as any).sidebarFeeds as SidebarEntry[]) ?? []);
+
+// ---------------------------------------------------------------------------
+// Per-feed customization modal (accessible from listing header on mobile)
+// ---------------------------------------------------------------------------
+const customizeOpen = ref(false);
+const customizeScraping = ref(false);
+const customizeHideImage = ref(false);
+const customizeSaving = ref(false);
+const customizeSaved = ref(false);
+
+const selectedFeedEntry = computed<SidebarEntry | null>(
+    () => sidebarFeeds.value.find((f) => f.id === selectedFeedId.value) ?? null,
+);
+
+function openFeedCustomize(): void {
+    if (!selectedFeedEntry.value) return;
+    customizeScraping.value = selectedFeedEntry.value.disable_full_article_scraping ?? false;
+    customizeHideImage.value = selectedFeedEntry.value.hide_image_in_detail ?? false;
+    customizeSaved.value = false;
+    customizeOpen.value = true;
+}
+
+async function saveFeedCustomize(): Promise<void> {
+    if (!selectedFeedEntry.value) return;
+    customizeSaving.value = true;
+    try {
+        await axios.patch(`/api/feeds/${selectedFeedEntry.value.id}/customize`, {
+            disable_full_article_scraping: customizeScraping.value,
+            hide_image_in_detail: customizeHideImage.value,
+        });
+        // Optimistically update local sidebar entry
+        const entry = sidebarFeeds.value.find((f) => f.id === selectedFeedEntry.value!.id);
+        if (entry) {
+            entry.disable_full_article_scraping = customizeScraping.value;
+            entry.hide_image_in_detail = customizeHideImage.value;
+        }
+        customizeSaved.value = true;
+        setTimeout(() => (customizeOpen.value = false), 900);
+    } finally {
+        customizeSaving.value = false;
+    }
+}
 const sidebarCategories = computed(() => ((page.props as any).sidebarCategories as SidebarEntry[]) ?? []);
 
 const pageTitle = computed<string>(() => {
@@ -386,6 +433,16 @@ watch(loadMoreBtn, (btn) => {
                     :title="t('general.mark_all_read')"
                 >
                     <CheckCheck class="h-4 w-4" />
+                </button>
+
+                <!-- Feed customize — only shown when a specific feed is active -->
+                <button
+                    v-if="selectedFeedId"
+                    @click="openFeedCustomize"
+                    class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    :title="t('feeds.customize')"
+                >
+                    <Settings2 class="h-4 w-4" />
                 </button>
 
                 <!-- View-mode toggle -->
@@ -775,6 +832,64 @@ watch(loadMoreBtn, (btn) => {
             </div>
         </div>
 
+        <!-- ── Feed Customization Modal ─────────────────────────────────────── -->
+        <Dialog v-model:open="customizeOpen">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{{ t('feeds.customize_title') }}<template v-if="selectedFeedEntry"> — {{ selectedFeedEntry.name }}</template></DialogTitle>
+                </DialogHeader>
+
+                <div class="space-y-5 py-2">
+                    <div class="flex items-start gap-3">
+                        <input
+                            id="idx-customize-disable-scraping"
+                            v-model="customizeScraping"
+                            type="checkbox"
+                            class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
+                        />
+                        <label for="idx-customize-disable-scraping" class="cursor-pointer space-y-0.5">
+                            <span class="block text-sm font-medium leading-snug">{{ t('feeds.disable_scraping_label') }}</span>
+                            <span class="block text-xs text-muted-foreground">{{ t('feeds.disable_scraping_desc') }}</span>
+                        </label>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <input
+                            id="idx-customize-hide-image"
+                            v-model="customizeHideImage"
+                            type="checkbox"
+                            class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
+                        />
+                        <label for="idx-customize-hide-image" class="cursor-pointer space-y-0.5">
+                            <span class="block text-sm font-medium leading-snug">{{ t('feeds.hide_image_label') }}</span>
+                            <span class="block text-xs text-muted-foreground">{{ t('feeds.hide_image_desc') }}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 pt-2">
+                    <span v-if="customizeSaved" class="text-xs text-green-600 dark:text-green-400">{{ t('feeds.customize_saved') }}</span>
+                    <span v-else class="flex-1" />
+                    <div class="flex gap-2">
+                        <button
+                            type="button"
+                            class="cursor-pointer rounded-lg border border-border px-4 py-1.5 text-sm hover:bg-muted"
+                            @click="customizeOpen = false"
+                        >
+                            {{ t('general.cancel') }}
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="customizeSaving"
+                            class="cursor-pointer rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                            @click="saveFeedCustomize"
+                        >
+                            {{ customizeSaving ? t('general.loading') : t('general.save') }}
+                        </button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
         <!-- ── Article reader modal (gallery style) ──────────────────────── -->
         <Teleport to="body">
             <div
@@ -797,7 +912,7 @@ watch(loadMoreBtn, (btn) => {
                     <div class="max-h-[90vh] min-w-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-2xl" @click.stop>
                         <!-- Modal header -->
                         <div
-                            class="sticky top-0 flex items-start justify-between gap-4 rounded-t-xl border-b border-border bg-background/95 px-5 py-4 backdrop-blur-sm"
+                            class="sticky top-0 z-30 flex items-start justify-between gap-4 rounded-t-xl border-b border-border bg-background/95 px-5 py-4 backdrop-blur-sm"
                         >
                             <div class="min-w-0">
                                 <h2 class="text-base leading-snug font-bold">
@@ -863,7 +978,7 @@ watch(loadMoreBtn, (btn) => {
                         <!-- Modal body -->
                         <div class="px-5 py-5">
                             <img
-                                v-if="readerArticle.thumbnail_url"
+                                v-if="readerArticle.thumbnail_url && !readerArticle.feed?.hide_image_in_detail"
                                 :src="readerArticle.thumbnail_url"
                                 :alt="readerArticle.title"
                                 loading="lazy"

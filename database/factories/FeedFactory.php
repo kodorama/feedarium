@@ -16,6 +16,8 @@ class FeedFactory extends Factory
             'url' => $this->faker->url(),
             'description' => $this->faker->sentence(),
             'active' => true,
+            'disable_full_article_scraping' => false,
+            'hide_image_in_detail' => false,
         ];
     }
 }

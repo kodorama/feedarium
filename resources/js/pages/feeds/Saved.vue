@@ -18,6 +18,7 @@ interface FeedMeta {
     id: number;
     name: string;
     favicon_url: string | null;
+    hide_image_in_detail?: boolean;
 }
 
 interface Article {
@@ -367,7 +368,7 @@ onUnmounted(() => {
                     <div class="max-h-[90vh] min-w-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-2xl" @click.stop>
                         <!-- Header -->
                         <div
-                            class="sticky top-0 flex items-start justify-between gap-4 rounded-t-xl border-b border-border bg-background/95 px-5 py-4 backdrop-blur-sm"
+                            class="sticky top-0 z-30 flex items-start justify-between gap-4 rounded-t-xl border-b border-border bg-background/95 px-5 py-4 backdrop-blur-sm"
                         >
                             <div class="min-w-0">
                                 <h2 class="text-base leading-snug font-bold">
@@ -428,7 +429,7 @@ onUnmounted(() => {
                         <!-- Body -->
                         <div class="px-5 py-5">
                             <img
-                                v-if="readerArticle.thumbnail_url"
+                                v-if="readerArticle.thumbnail_url && !readerArticle.feed?.hide_image_in_detail"
                                 :src="readerArticle.thumbnail_url"
                                 :alt="readerArticle.title"
                                 loading="lazy"

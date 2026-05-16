@@ -3,8 +3,10 @@
 use App\Models\Feed;
 use App\Models\News;
 use App\Models\User;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Queue;
 use App\Domains\Feed\Jobs\ImportFeedItemsJob;
+use App\Domains\News\Jobs\ScrapeArticleBodyJob;
 use App\Domains\News\Jobs\ScrapeArticleThumbnailJob;
 
 $rssXml = <<<'XML'
@@ -63,5 +65,23 @@ describe('ImportFeedItemsJob', function () use ($rssXml) {
         (new ImportFeedItemsJob($feed->id, $rssXml))->handle();
 
         Queue::assertPushed(ScrapeArticleThumbnailJob::class, 1);
+    });
+
+    it('skips ScrapeArticleBodyJob when feed has disable_full_article_scraping enabled', function () use ($rssXml) {
+        Setting::set('scrape_full_body', 'true');
+        $feed = Feed::factory()->create(['disable_full_article_scraping' => true]);
+
+        (new ImportFeedItemsJob($feed->id, $rssXml))->handle();
+
+        Queue::assertNotPushed(ScrapeArticleBodyJob::class);
+    });
+
+    it('dispatches ScrapeArticleBodyJob when scraping enabled and feed override is off', function () use ($rssXml) {
+        Setting::set('scrape_full_body', 'true');
+        $feed = Feed::factory()->create(['disable_full_article_scraping' => false]);
+
+        (new ImportFeedItemsJob($feed->id, $rssXml))->handle();
+
+        Queue::assertPushed(ScrapeArticleBodyJob::class, 1);
     });
 });

@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property string|null $last_modified_header
  * @property \Illuminate\Support\Carbon|null $last_fetched_at
  * @property string|null $hub_url
+ * @property bool $disable_full_article_scraping
+ * @property bool $hide_image_in_detail
  * @property string|null $websub_secret
  * @property \Illuminate\Support\Carbon|null $websub_subscribed_at
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -47,6 +49,8 @@ final class Feed extends Model
         'last_modified_header',
         'last_fetched_at',
         'hub_url',
+        'disable_full_article_scraping',
+        'hide_image_in_detail',
         'websub_secret',
         'websub_subscribed_at',
     ];
@@ -55,6 +59,8 @@ final class Feed extends Model
     {
         return [
             'active' => 'boolean',
+            'disable_full_article_scraping' => 'boolean',
+            'hide_image_in_detail' => 'boolean',
             'last_fetched_at' => 'datetime',
             'websub_subscribed_at' => 'datetime',
         ];

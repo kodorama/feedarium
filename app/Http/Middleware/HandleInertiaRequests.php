@@ -62,7 +62,7 @@ class HandleInertiaRequests extends Middleware
                     ->where('active', true)
                     ->withCount(['news as unread_count' => fn ($q) => $q->where('is_read', false)])
                     ->orderBy('name')
-                    ->get(['id', 'name', 'category_id', 'favicon_url'])
+                    ->get(['id', 'name', 'category_id', 'favicon_url', 'disable_full_article_scraping', 'hide_image_in_detail'])
                 : [],
         ];
     }

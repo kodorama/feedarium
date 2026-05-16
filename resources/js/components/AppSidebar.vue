@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     Sidebar,
     SidebarContent,
@@ -16,7 +17,8 @@ import {
 import { useAutoAdvance } from '@/composables/useAutoAdvance';
 import { useReadStatus } from '@/composables/useReadStatus';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { Bookmark, CheckCheck, ChevronRight, FolderOpen, LogOut, Rss, Settings } from 'lucide-vue-next';
+import axios from '@/lib/axios';
+import { Bookmark, CheckCheck, ChevronRight, FolderOpen, LogOut, Rss, Settings, Settings2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppLogo from './AppLogo.vue';
@@ -37,12 +39,54 @@ interface SidebarFeed {
     category_id: number | null;
     favicon_url: string | null;
     unread_count: number;
+    disable_full_article_scraping: boolean;
+    hide_image_in_detail: boolean;
 }
 
 const sidebarCategories = computed(() => ((page.props as any).sidebarCategories as SidebarCategory[]) ?? []);
 const sidebarFeeds = computed(() => ((page.props as any).sidebarFeeds as SidebarFeed[]) ?? []);
 const selectedFeedId = computed(() => ((page.props as any).selectedFeedId as number | null) ?? null);
 const selectedCategoryId = computed(() => ((page.props as any).selectedCategoryId as number | null) ?? null);
+
+// ---------------------------------------------------------------------------
+// Per-feed customization modal state
+// ---------------------------------------------------------------------------
+const customizeFeedTarget = ref<SidebarFeed | null>(null);
+const customizeOpen = ref(false);
+const customizeScraping = ref(false);
+const customizeHideImage = ref(false);
+const customizeSaving = ref(false);
+const customizeSaved = ref(false);
+
+function openCustomize(feed: SidebarFeed): void {
+    customizeFeedTarget.value = feed;
+    customizeScraping.value = feed.disable_full_article_scraping;
+    customizeHideImage.value = feed.hide_image_in_detail;
+    customizeSaved.value = false;
+    customizeOpen.value = true;
+}
+
+async function saveCustomize(): Promise<void> {
+    if (!customizeFeedTarget.value) return;
+    customizeSaving.value = true;
+    try {
+        await axios.patch(`/api/feeds/${customizeFeedTarget.value.id}/customize`, {
+            disable_full_article_scraping: customizeScraping.value,
+            hide_image_in_detail: customizeHideImage.value,
+        });
+        // Update local sidebar data optimistically
+        const feed = sidebarFeeds.value.find((f) => f.id === customizeFeedTarget.value!.id);
+        if (feed) {
+            feed.disable_full_article_scraping = customizeScraping.value;
+            feed.hide_image_in_detail = customizeHideImage.value;
+        }
+        customizeSaved.value = true;
+        setTimeout(() => (customizeOpen.value = false), 900);
+    } finally {
+        customizeSaving.value = false;
+    }
+}
+
 
 const currentUrl = computed(() => page.url);
 
@@ -194,9 +238,19 @@ watch(markAllSignal, (sig) => {
                     <!-- Uncategorized feeds -->
                     <SidebarMenuItem v-for="feed in uncategorizedFeeds" :key="feed.id">
                         <SidebarMenuButton :is-active="isFeedActive(feed.id)" :tooltip="feed.name" as-child>
-                            <button @click="selectFeed(feed.id)" class="flex w-full items-center gap-2 pr-1">
-                                <img v-if="feed.favicon_url" :src="feed.favicon_url" class="h-4 w-4 shrink-0 rounded-sm object-contain" alt="" />
-                                <Rss v-else class="h-4 w-4 shrink-0 opacity-60" />
+                            <button @click="selectFeed(feed.id)" class="group flex w-full items-center gap-2 pr-1">
+                                <!-- Favicon / gear toggle -->
+                                <span class="relative h-4 w-4 shrink-0">
+                                    <img v-if="feed.favicon_url" :src="feed.favicon_url" class="h-4 w-4 rounded-sm object-contain transition-opacity group-hover:opacity-0" alt="" />
+                                    <Rss v-else class="h-4 w-4 opacity-60 transition-opacity group-hover:opacity-0" />
+                                    <span
+                                        class="absolute inset-0 flex cursor-pointer items-center justify-center rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+                                        :title="t('feeds.customize')"
+                                        @click.stop="openCustomize(feed)"
+                                    >
+                                        <Settings2 class="h-3.5 w-3.5 text-muted-foreground" />
+                                    </span>
+                                </span>
                                 <span class="flex-1 truncate text-left">{{ feed.name }}</span>
                                 <span
                                     v-if="feedUnread(feed) > 0"
@@ -253,14 +307,24 @@ watch(markAllSignal, (sig) => {
                                 <SidebarMenuSub>
                                     <SidebarMenuSubItem v-for="feed in feedsByCategory.get(category.id) ?? []" :key="feed.id">
                                         <SidebarMenuSubButton :is-active="isFeedActive(feed.id)" as-child>
-                                            <button @click="selectFeed(feed.id)" class="flex w-full items-center gap-2 pr-1">
-                                                <img
-                                                    v-if="feed.favicon_url"
-                                                    :src="feed.favicon_url"
-                                                    class="h-3.5 w-3.5 shrink-0 rounded-sm object-contain"
-                                                    alt=""
-                                                />
-                                                <Rss v-else class="h-3.5 w-3.5 shrink-0 opacity-60" />
+                                            <button @click="selectFeed(feed.id)" class="group flex w-full items-center gap-2 pr-1">
+                                                <!-- Favicon / gear toggle -->
+                                                <span class="relative h-3.5 w-3.5 shrink-0">
+                                                    <img
+                                                        v-if="feed.favicon_url"
+                                                        :src="feed.favicon_url"
+                                                        class="h-3.5 w-3.5 rounded-sm object-contain transition-opacity group-hover:opacity-0"
+                                                        alt=""
+                                                    />
+                                                    <Rss v-else class="h-3.5 w-3.5 opacity-60 transition-opacity group-hover:opacity-0" />
+                                                    <span
+                                                        class="absolute inset-0 flex cursor-pointer items-center justify-center rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+                                                        :title="t('feeds.customize')"
+                                                        @click.stop="openCustomize(feed)"
+                                                    >
+                                                        <Settings2 class="h-3 w-3 text-muted-foreground" />
+                                                    </span>
+                                                </span>
                                                 <span class="flex-1 truncate text-left">{{ feed.name }}</span>
                                                 <span
                                                     v-if="feedUnread(feed) > 0"
@@ -312,4 +376,65 @@ watch(markAllSignal, (sig) => {
         </SidebarContent>
     </Sidebar>
     <slot />
+
+    <!-- ── Feed Customization Modal ─────────────────────────────────────── -->
+    <Dialog v-model:open="customizeOpen">
+        <DialogContent class="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>{{ t('feeds.customize_title') }}<template v-if="customizeFeedTarget"> — {{ customizeFeedTarget.name }}</template></DialogTitle>
+            </DialogHeader>
+
+            <div class="space-y-5 py-2">
+                <!-- Disable full article scraping -->
+                <div class="flex items-start gap-3">
+                    <input
+                        id="customize-disable-scraping"
+                        v-model="customizeScraping"
+                        type="checkbox"
+                        class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
+                    />
+                    <label for="customize-disable-scraping" class="cursor-pointer space-y-0.5">
+                        <span class="block text-sm font-medium leading-snug">{{ t('feeds.disable_scraping_label') }}</span>
+                        <span class="block text-xs text-muted-foreground">{{ t('feeds.disable_scraping_desc') }}</span>
+                    </label>
+                </div>
+
+                <!-- Hide image in detail popup -->
+                <div class="flex items-start gap-3">
+                    <input
+                        id="customize-hide-image"
+                        v-model="customizeHideImage"
+                        type="checkbox"
+                        class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
+                    />
+                    <label for="customize-hide-image" class="cursor-pointer space-y-0.5">
+                        <span class="block text-sm font-medium leading-snug">{{ t('feeds.hide_image_label') }}</span>
+                        <span class="block text-xs text-muted-foreground">{{ t('feeds.hide_image_desc') }}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3 pt-2">
+                <span v-if="customizeSaved" class="text-xs text-green-600 dark:text-green-400">{{ t('feeds.customize_saved') }}</span>
+                <span v-else class="flex-1" />
+                <div class="flex gap-2">
+                    <button
+                        type="button"
+                        class="cursor-pointer rounded-lg border border-border px-4 py-1.5 text-sm hover:bg-muted"
+                        @click="customizeOpen = false"
+                    >
+                        {{ t('general.cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        :disabled="customizeSaving"
+                        class="cursor-pointer rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="saveCustomize"
+                    >
+                        {{ customizeSaving ? t('general.loading') : t('general.save') }}
+                    </button>
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
 </template>

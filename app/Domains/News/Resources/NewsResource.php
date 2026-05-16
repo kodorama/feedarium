@@ -25,6 +25,7 @@ final class NewsResource extends JsonResource
                 'id' => $this->feed->id,
                 'name' => $this->feed->name,
                 'favicon_url' => $this->feed->favicon_url,
+                'hide_image_in_detail' => (bool) $this->feed->hide_image_in_detail,
             ],
         ];
     }

@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int $id
  * @property string $name
  * @property string $email
+ * @property string|null $locale
+ * @property string|null $timezone
  * @property string $password
  * @property string|null $remember_token
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -37,6 +39,8 @@ final class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'is_admin',
+        'locale',
+        'timezone',
     ];
 
     /**

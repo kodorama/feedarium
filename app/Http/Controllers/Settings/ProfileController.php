@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Settings;
 
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Domains\Settings\Support\LocaleDetector;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 
 class ProfileController extends Controller
@@ -18,9 +20,15 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('settings/Profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'availableLocales' => LocaleDetector::availableWithMetadata()->values()->all(),
+            'availableTimezones' => \DateTimeZone::listIdentifiers(\DateTimeZone::ALL),
+            'userLocale' => $user->locale ?? LocaleDetector::resolve(Setting::get('locale')),
+            'userTimezone' => $user->timezone ?? config('app.timezone', 'UTC'),
         ]);
     }
 

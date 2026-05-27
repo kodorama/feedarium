@@ -129,5 +129,117 @@
         "forgot_password": "Forgot password?",
         "reset_password": "Reset Password",
         "confirm_password": "Confirm Password"
+    },
+    "settings": {
+        "title": "Settings",
+        "description": "Manage your profile and account settings",
+        "nav": {
+            "profile": "Profile",
+            "password": "Password",
+            "appearance": "Appearance",
+            "reading": "Reading",
+            "categories": "Categories",
+            "feeds": "Feed Sources",
+            "search": "Search",
+            "advanced": "Advanced"
+        },
+        "breadcrumb": {
+            "settings": "Settings",
+            "profile": "Profile settings",
+            "password": "Password settings",
+            "appearance": "Appearance settings",
+            "reading": "Reading",
+            "categories": "Categories",
+            "feeds": "Feed Sources",
+            "search": "Search",
+            "advanced": "Advanced"
+        },
+        "profile": {
+            "profile_information": "Profile information",
+            "profile_information_desc": "Update your name and email address",
+            "preferences": "Language & timezone",
+            "preferences_desc": "Update your language and timezone preferences",
+            "name": "Name",
+            "email": "Email address",
+            "language": "Language",
+            "timezone": "Timezone",
+            "save": "Save",
+            "saved": "Saved."
+        },
+        "password": {
+            "title": "Update password",
+            "description": "Ensure your account is using a long, random password to stay secure",
+            "current_password": "Current password",
+            "new_password": "New password",
+            "confirm_password": "Confirm password",
+            "save": "Save password",
+            "saved": "Saved."
+        },
+        "appearance": {
+            "title": "Appearance settings",
+            "description": "Update your account's appearance settings"
+        },
+        "categories": {
+            "title": "Categories",
+            "description": "Organise your feed sources into categories.",
+            "add": "Add",
+            "name_label": "Name *",
+            "description_label": "Description",
+            "name_placeholder": "Technology",
+            "description_placeholder": "Optional description",
+            "no_items": "No categories yet.",
+            "created": "Category created successfully.",
+            "updated": "Category updated successfully.",
+            "deleted": "Category deleted.",
+            "create_failed": "Failed to create category. Please try again.",
+            "update_failed": "Failed to update category. Please try again.",
+            "delete_failed": "Failed to delete category."
+        },
+        "feeds": {
+            "title": "Feed Sources",
+            "description": "Add RSS/Atom feeds to follow.",
+            "add": "Add",
+            "name_label": "Name *",
+            "url_label": "Feed URL *",
+            "category_label": "Category",
+            "description_label": "Description",
+            "active_label": "Active",
+            "none_option": "— None —",
+            "no_items": "No feed sources yet. Add one to get started.",
+            "uncategorized": "Uncategorized",
+            "activate_title": "Activate",
+            "deactivate_title": "Deactivate",
+            "activated": "Feed activated.",
+            "deactivated": "Feed deactivated.",
+            "toggle_failed": "Failed to toggle feed status.",
+            "created": "Feed source added successfully.",
+            "updated": "Feed source updated successfully.",
+            "deleted": "Feed source deleted.",
+            "create_failed": "Failed to add feed source. Please try again.",
+            "update_failed": "Failed to update feed source. Please try again.",
+            "delete_failed": "Failed to delete feed source."
+        },
+        "search": {
+            "title": "Search",
+            "description": "Manage the full-text search index for articles.",
+            "active_driver": "Active driver:",
+            "operations_note": "All operations run in the background via the queue worker.",
+            "import": "Import All Articles",
+            "importing": "Dispatching…",
+            "flush": "Flush Index",
+            "flushing": "Dispatching…",
+            "sync_settings": "Sync Index Settings",
+            "syncing": "Syncing…",
+            "import_success": "Import job dispatched. Articles will be indexed in the background.",
+            "import_failed": "Failed to dispatch import job.",
+            "flush_success": "Flush job dispatched. The search index will be cleared in the background.",
+            "flush_failed": "Failed to dispatch flush job.",
+            "sync_success": "Search index settings synced successfully.",
+            "sync_failed": "Failed to sync index settings.",
+            "admin_only": "Search index management is available to administrators only."
+        },
+        "advanced": {
+            "admin_only": "Advanced settings are available to administrators only."
+        }
     }
 }

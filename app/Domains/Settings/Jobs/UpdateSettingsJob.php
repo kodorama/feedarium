@@ -24,5 +24,9 @@ final class UpdateSettingsJob
         if ($this->request->has('scrape_full_body')) {
             Setting::set('scrape_full_body', $this->request->boolean('scrape_full_body') ? 'true' : 'false');
         }
+
+        if ($this->request->has('locale')) {
+            Setting::set('locale', $this->request->string('locale')->toString());
+        }
     }
 }

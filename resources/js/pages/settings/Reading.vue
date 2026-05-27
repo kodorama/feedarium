@@ -6,6 +6,7 @@ import { useAutoAdvance } from '@/composables/useAutoAdvance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
+import { computed } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 
@@ -13,10 +14,10 @@ const { t } = useI18n();
 const { autoAdvanceEnabled, setAutoAdvance } = useAutoAdvance();
 const { rawMode, setRawModeDefault } = useArticleContent();
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Reading', href: '/settings/reading' },
-];
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: t('settings.breadcrumb.settings'), href: '/settings/profile' },
+    { title: t('settings.breadcrumb.reading'), href: '/settings/reading' },
+]);
 </script>
 
 <template>

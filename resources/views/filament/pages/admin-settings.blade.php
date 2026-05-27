@@ -25,7 +25,9 @@
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Interface Language</label>
                     <div class="mt-2">
                         <select wire:model="language" class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white">
-                            <option value="en">English</option>
+                            @foreach ($this->availableLocales as $code => $meta)
+                                <option value="{{ $code }}">{{ $meta['native'] }} ({{ $meta['name'] }})</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>

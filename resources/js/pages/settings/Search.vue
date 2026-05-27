@@ -7,6 +7,9 @@ import { type AppPageProps, type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 interface Props {
     scoutDriver: string;
@@ -18,10 +21,10 @@ const page = usePage<AppPageProps>();
 const isAdmin = computed(() => page.props.auth.user.is_admin === true);
 const isMeilisearch = computed(() => props.scoutDriver === 'meilisearch');
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Search', href: '/settings/search' },
-];
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: t('settings.breadcrumb.settings'), href: '/settings/profile' },
+    { title: t('settings.breadcrumb.search'), href: '/settings/search' },
+]);
 
 interface Toast {
     type: 'success' | 'error';
@@ -44,9 +47,9 @@ async function importIndex() {
     importing.value = true;
     try {
         await axios.post('/api/scout/import');
-        showToast('success', 'Import job dispatched. Articles will be indexed in the background.');
+        showToast('success', t('settings.search.import_success'));
     } catch {
-        showToast('error', 'Failed to dispatch import job.');
+        showToast('error', t('settings.search.import_failed'));
     } finally {
         importing.value = false;
     }
@@ -56,9 +59,9 @@ async function flushIndex() {
     flushing.value = true;
     try {
         await axios.post('/api/scout/flush');
-        showToast('success', 'Flush job dispatched. The search index will be cleared in the background.');
+        showToast('success', t('settings.search.flush_success'));
     } catch {
-        showToast('error', 'Failed to dispatch flush job.');
+        showToast('error', t('settings.search.flush_failed'));
     } finally {
         flushing.value = false;
     }
@@ -68,9 +71,9 @@ async function syncSettings() {
     syncing.value = true;
     try {
         await axios.post('/api/scout/sync-settings');
-        showToast('success', 'Search index settings synced successfully.');
+        showToast('success', t('settings.search.sync_success'));
     } catch {
-        showToast('error', 'Failed to sync index settings.');
+        showToast('error', t('settings.search.sync_failed'));
     } finally {
         syncing.value = false;
     }
@@ -79,11 +82,11 @@ async function syncSettings() {
 
 <template>
     <AppLayout :breadcrumbs="breadcrumbs">
-        <Head title="Search settings" />
+        <Head :title="t('settings.breadcrumb.search')" />
 
         <SettingsLayout>
             <div class="space-y-6">
-                <HeadingSmall title="Search" description="Manage the full-text search index for articles." />
+                <HeadingSmall :title="t('settings.search.title')" :description="t('settings.search.description')" />
 
                 <!-- Toast notification -->
                 <div
@@ -101,32 +104,32 @@ async function syncSettings() {
                 <template v-if="isAdmin">
                     <!-- Driver info -->
                     <div class="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                        Active driver:
+                        {{ t('settings.search.active_driver') }}
                         <span class="font-medium text-foreground">{{ scoutDriver }}</span>
                     </div>
 
                     <!-- Index operations -->
                     <div class="space-y-3">
-                        <p class="text-sm text-muted-foreground">All operations run in the background via the queue worker.</p>
+                        <p class="text-sm text-muted-foreground">{{ t('settings.search.operations_note') }}</p>
 
                         <div class="flex flex-wrap gap-3">
                             <Button @click="importIndex" :disabled="importing">
-                                {{ importing ? 'Dispatching…' : 'Import All Articles' }}
+                                {{ importing ? t('settings.search.importing') : t('settings.search.import') }}
                             </Button>
 
                             <Button variant="outline" @click="flushIndex" :disabled="flushing">
-                                {{ flushing ? 'Dispatching…' : 'Flush Index' }}
+                                {{ flushing ? t('settings.search.flushing') : t('settings.search.flush') }}
                             </Button>
 
                             <Button v-if="isMeilisearch" variant="secondary" @click="syncSettings" :disabled="syncing">
-                                {{ syncing ? 'Syncing…' : 'Sync Index Settings' }}
+                                {{ syncing ? t('settings.search.syncing') : t('settings.search.sync_settings') }}
                             </Button>
                         </div>
                     </div>
                 </template>
 
                 <template v-else>
-                    <p class="text-sm text-muted-foreground">Search index management is available to administrators only.</p>
+                    <p class="text-sm text-muted-foreground">{{ t('settings.search.admin_only') }}</p>
                 </template>
             </div>
         </SettingsLayout>

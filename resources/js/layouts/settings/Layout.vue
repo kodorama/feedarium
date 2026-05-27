@@ -5,23 +5,26 @@ import { Separator } from '@/components/ui/separator';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const page = usePage();
 
 const isAdmin = computed(() => (page.props.auth?.user as any)?.is_admin === true);
 
-const baseNavItems: NavItem[] = [
-    { title: 'Profile', href: '/settings/profile' },
-    { title: 'Password', href: '/settings/password' },
-    { title: 'Appearance', href: '/settings/appearance' },
-    { title: 'Reading', href: '/settings/reading' },
-    { title: 'Categories', href: '/settings/categories' },
-    { title: 'Feed Sources', href: '/settings/feeds' },
-];
-
 const sidebarNavItems = computed<NavItem[]>(() => [
-    ...baseNavItems,
-    ...(isAdmin.value ? [{ title: 'Search', href: '/settings/search' }, { title: 'Advanced', href: '/settings/advanced' }] : []),
+    { title: t('settings.nav.profile'), href: '/settings/profile' },
+    { title: t('settings.nav.password'), href: '/settings/password' },
+    { title: t('settings.nav.appearance'), href: '/settings/appearance' },
+    { title: t('settings.nav.reading'), href: '/settings/reading' },
+    { title: t('settings.nav.categories'), href: '/settings/categories' },
+    { title: t('settings.nav.feeds'), href: '/settings/feeds' },
+    ...(isAdmin.value
+        ? [
+              { title: t('settings.nav.search'), href: '/settings/search' },
+              { title: t('settings.nav.advanced'), href: '/settings/advanced' },
+          ]
+        : []),
 ]);
 
 const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.location).pathname : '';
@@ -29,7 +32,7 @@ const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.locati
 
 <template>
     <div class="px-4 py-6">
-        <Heading title="Settings" description="Manage your profile and account settings" />
+        <Heading :title="t('settings.title')" :description="t('settings.description')" />
 
         <div class="flex flex-col space-y-8 md:space-y-0 lg:flex-row lg:space-y-0 lg:space-x-12">
             <aside class="w-full max-w-xl lg:w-48">

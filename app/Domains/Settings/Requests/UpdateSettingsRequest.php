@@ -2,7 +2,9 @@
 
 namespace App\Domains\Settings\Requests;
 
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
+use App\Domains\Settings\Support\LocaleDetector;
 
 final class UpdateSettingsRequest extends FormRequest
 {
@@ -20,6 +22,7 @@ final class UpdateSettingsRequest extends FormRequest
             'news_retention_enabled' => ['sometimes', 'boolean'],
             'news_retention_days' => ['sometimes', 'integer', 'min:1', 'max:3650'],
             'scrape_full_body' => ['sometimes', 'boolean'],
+            'locale' => ['sometimes', 'string', Rule::in(LocaleDetector::available()->all())],
         ];
     }
 }

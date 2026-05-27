@@ -5,6 +5,7 @@ namespace App\Http\Requests\Settings;
 use App\Models\User;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
+use App\Domains\Settings\Support\LocaleDetector;
 
 class ProfileUpdateRequest extends FormRequest
 {
@@ -25,6 +26,8 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'locale' => ['required', 'string', Rule::in(LocaleDetector::available()->all())],
+            'timezone' => ['required', 'string', 'timezone:all'],
         ];
     }
 }

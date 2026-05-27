@@ -9,15 +9,15 @@ import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Check, Pencil, Plus, Tag, Trash2, X } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Categories', href: '/settings/categories' },
-];
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: t('settings.breadcrumb.settings'), href: '/settings/profile' },
+    { title: t('settings.breadcrumb.categories'), href: '/settings/categories' },
+]);
 
 interface Category {
     id: number;
@@ -72,7 +72,7 @@ async function createCategory() {
         categories.value.unshift(res.data.category);
         addForm.value = { name: '', description: '' };
         showAddForm.value = false;
-        showToast('success', 'Category created successfully.');
+        showToast('success', t('settings.categories.created'));
     } catch (e: any) {
         if (e.response?.status === 422) {
             const errs = e.response.data.errors ?? {};
@@ -80,7 +80,7 @@ async function createCategory() {
                 errors.value[`add_${k}`] = errs[k][0];
             });
         } else {
-            showToast('error', 'Failed to create category. Please try again.');
+            showToast('error', t('settings.categories.create_failed'));
         }
     } finally {
         saving.value = false;
@@ -111,7 +111,7 @@ async function saveEdit(id: number) {
             categories.value[idx] = res.data.category;
         }
         editingId.value = null;
-        showToast('success', 'Category updated successfully.');
+        showToast('success', t('settings.categories.updated'));
     } catch (e: any) {
         if (e.response?.status === 422) {
             const errs = e.response.data.errors ?? {};
@@ -119,7 +119,7 @@ async function saveEdit(id: number) {
                 errors.value[`edit_${k}`] = errs[k][0];
             });
         } else {
-            showToast('error', 'Failed to update category. Please try again.');
+            showToast('error', t('settings.categories.update_failed'));
         }
     } finally {
         saving.value = false;
@@ -134,9 +134,9 @@ async function deleteCategory(id: number) {
     try {
         await axios.delete(`/api/categories/${id}`);
         categories.value = categories.value.filter((c) => c.id !== id);
-        showToast('success', 'Category deleted.');
+        showToast('success', t('settings.categories.deleted'));
     } catch {
-        showToast('error', 'Failed to delete category.');
+        showToast('error', t('settings.categories.delete_failed'));
     } finally {
         deleting.value = null;
     }
@@ -174,26 +174,26 @@ onMounted(loadCategories);
                 </Transition>
 
                 <div class="flex items-center justify-between">
-                    <HeadingSmall title="Categories" description="Organise your feed sources into categories." />
+                    <HeadingSmall :title="t('settings.categories.title')" :description="t('settings.categories.description')" />
                     <Button size="sm" variant="outline" @click="showAddForm = !showAddForm">
                         <Plus class="mr-1 h-4 w-4" />
-                        Add
+                        {{ t('settings.categories.add') }}
                     </Button>
                 </div>
 
                 <!-- Add form -->
                 <form v-if="showAddForm" @submit.prevent="createCategory" class="space-y-3 rounded-lg border border-border bg-muted/40 p-4">
                     <div class="grid gap-1.5">
-                        <Label for="add-name">Name *</Label>
-                        <Input id="add-name" v-model="addForm.name" placeholder="Technology" required />
+                        <Label for="add-name">{{ t('settings.categories.name_label') }}</Label>
+                        <Input id="add-name" v-model="addForm.name" :placeholder="t('settings.categories.name_placeholder')" required />
                         <p v-if="errors.add_name" class="text-xs text-destructive">{{ errors.add_name }}</p>
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="add-desc">Description</Label>
-                        <Input id="add-desc" v-model="addForm.description" placeholder="Optional description" />
+                        <Label for="add-desc">{{ t('settings.categories.description_label') }}</Label>
+                        <Input id="add-desc" v-model="addForm.description" :placeholder="t('settings.categories.description_placeholder')" />
                     </div>
                     <div class="flex gap-2">
-                        <Button type="submit" size="sm" :disabled="saving">Save</Button>
+                        <Button type="submit" size="sm" :disabled="saving">{{ t('general.save') }}</Button>
                         <Button
                             type="button"
                             size="sm"
@@ -202,7 +202,7 @@ onMounted(loadCategories);
                                 showAddForm = false;
                                 errors = {};
                             "
-                            >Cancel</Button
+                            >{{ t('general.cancel') }}</Button
                         >
                     </div>
                 </form>
@@ -213,7 +213,7 @@ onMounted(loadCategories);
                 <!-- Empty state -->
                 <div v-else-if="categories.length === 0" class="py-8 text-center text-sm text-muted-foreground">
                     <Tag class="mx-auto mb-2 h-8 w-8 opacity-40" />
-                    <p>No categories yet.</p>
+                    <p>{{ t('settings.categories.no_items') }}</p>
                 </div>
 
                 <!-- List -->
@@ -222,13 +222,13 @@ onMounted(loadCategories);
                         <!-- Edit mode -->
                         <form v-if="editingId === cat.id" @submit.prevent="saveEdit(cat.id)" class="space-y-2">
                             <div class="grid gap-1">
-                                <Input v-model="editForm.name" placeholder="Name" required />
+                                <Input v-model="editForm.name" :placeholder="t('settings.profile.name')" required />
                                 <p v-if="errors.edit_name" class="text-xs text-destructive">{{ errors.edit_name }}</p>
                             </div>
-                            <Input v-model="editForm.description" placeholder="Description (optional)" />
+                            <Input v-model="editForm.description" :placeholder="t('settings.categories.description_placeholder')" />
                             <div class="flex gap-2">
-                                <Button type="submit" size="sm" :disabled="saving"> <Check class="mr-1 h-4 w-4" /> Save </Button>
-                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit"> <X class="mr-1 h-4 w-4" /> Cancel </Button>
+                                <Button type="submit" size="sm" :disabled="saving"> <Check class="mr-1 h-4 w-4" /> {{ t('general.save') }} </Button>
+                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit"> <X class="mr-1 h-4 w-4" /> {{ t('general.cancel') }} </Button>
                             </div>
                         </form>
 

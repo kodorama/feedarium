@@ -8,6 +8,7 @@ import { useSavedArticles } from '@/composables/useSavedArticles';
 import { useViewPreferences } from '@/composables/useViewPreferences';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TitleTooltip } from '@/components/ui/tooltip';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
 import axios from '@/lib/axios';
@@ -412,87 +413,97 @@ watch(loadMoreBtn, (btn) => {
             <!-- Actions: sit right of title on mobile (order-2 + ml-auto), end of row on md+ (order-3) -->
             <div class="order-2 ml-auto flex shrink-0 items-center gap-1.5 md:order-3 md:ml-0">
                 <!-- Show unread only / Show all toggle -->
-                <button
-                    @click="showUnreadOnly = !showUnreadOnly"
-                    :class="[
-                        'cursor-pointer rounded-lg p-1.5 transition-colors',
-                        showUnreadOnly
-                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    ]"
-                    :title="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')"
-                >
-                    <MailOpen v-if="showUnreadOnly" class="h-4 w-4" />
-                    <Mail v-else class="h-4 w-4" />
-                </button>
+                <TitleTooltip :title="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')">
+                    <button
+                        @click="showUnreadOnly = !showUnreadOnly"
+                        :class="[
+                            'cursor-pointer rounded-lg p-1.5 transition-colors',
+                            showUnreadOnly
+                                ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        ]"
+                        :aria-label="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')"
+                    >
+                        <MailOpen v-if="showUnreadOnly" class="h-4 w-4" />
+                        <Mail v-else class="h-4 w-4" />
+                    </button>
+                </TitleTooltip>
 
                 <!-- Mark all as read -->
-                <button
-                    @click="markAllVisible"
-                    class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    :title="t('general.mark_all_read')"
-                >
-                    <CheckCheck class="h-4 w-4" />
-                </button>
+                <TitleTooltip :title="t('general.mark_all_read')">
+                    <button
+                        @click="markAllVisible"
+                        class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        :aria-label="t('general.mark_all_read')"
+                    >
+                        <CheckCheck class="h-4 w-4" />
+                    </button>
+                </TitleTooltip>
 
                 <!-- Feed customize — only shown when a specific feed is active -->
-                <button
-                    v-if="selectedFeedId"
-                    @click="openFeedCustomize"
-                    class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    :title="t('feeds.customize')"
-                >
-                    <Settings2 class="h-4 w-4" />
-                </button>
+                <TitleTooltip v-if="selectedFeedId" :title="t('feeds.customize')">
+                    <button
+                        @click="openFeedCustomize"
+                        class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        :aria-label="t('feeds.customize')"
+                    >
+                        <Settings2 class="h-4 w-4" />
+                    </button>
+                </TitleTooltip>
 
                 <!-- View-mode toggle -->
                 <div class="flex items-center gap-0.5 rounded-lg border border-border p-1">
-                    <button
-                        @click="viewMode = 'list'"
-                        :class="[
-                            'cursor-pointer rounded p-1.5 transition-colors',
-                            viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                        ]"
-                        :title="t('general.list_view')"
-                    >
-                        <LayoutList class="h-4 w-4" />
-                    </button>
-                    <button
-                        @click="viewMode = 'compact'"
-                        :class="[
-                            'cursor-pointer rounded p-1.5 transition-colors',
-                            viewMode === 'compact' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                        ]"
-                        :title="t('general.compact_view')"
-                    >
-                        <AlignJustify class="h-4 w-4" />
-                    </button>
-                    <button
-                        @click="viewMode = 'grid'"
-                        :class="[
-                            'cursor-pointer rounded p-1.5 transition-colors',
-                            viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                        ]"
-                        :title="t('general.grid_view')"
-                    >
-                        <LayoutGrid class="h-4 w-4" />
-                    </button>
+                    <TitleTooltip :title="t('general.list_view')">
+                        <button
+                            @click="viewMode = 'list'"
+                            :class="[
+                                'cursor-pointer rounded p-1.5 transition-colors',
+                                viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                            ]"
+                            :aria-label="t('general.list_view')"
+                        >
+                            <LayoutList class="h-4 w-4" />
+                        </button>
+                    </TitleTooltip>
+                    <TitleTooltip :title="t('general.compact_view')">
+                        <button
+                            @click="viewMode = 'compact'"
+                            :class="[
+                                'cursor-pointer rounded p-1.5 transition-colors',
+                                viewMode === 'compact' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                            ]"
+                            :aria-label="t('general.compact_view')"
+                        >
+                            <AlignJustify class="h-4 w-4" />
+                        </button>
+                    </TitleTooltip>
+                    <TitleTooltip :title="t('general.grid_view')">
+                        <button
+                            @click="viewMode = 'grid'"
+                            :class="[
+                                'cursor-pointer rounded p-1.5 transition-colors',
+                                viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                            ]"
+                            :aria-label="t('general.grid_view')"
+                        >
+                            <LayoutGrid class="h-4 w-4" />
+                        </button>
+                    </TitleTooltip>
 
                     <!-- Column count — only visible in grid mode, numbers hidden on mobile portrait -->
                     <template v-if="viewMode === 'grid'">
                         <div class="mx-1 hidden h-4 w-px shrink-0 bg-border sm:block" />
-                        <button
-                            v-for="col in [2, 3, 4]"
-                            :key="col"
-                            @click="gridColumns = col"
-                            :class="[
-                                'hidden min-w-6 cursor-pointer rounded p-1.5 text-xs font-semibold transition-colors sm:inline-flex',
-                                gridColumns === col ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                            ]"
-                            :title="`${col} ${t('general.columns')}`"
-                        >
-                            {{ col }}
-                        </button>
+                        <TitleTooltip v-for="col in [2, 3, 4]" :key="col" :title="`${col} ${t('general.columns')}`">
+                            <button
+                                @click="gridColumns = col"
+                                :class="[
+                                    'hidden min-w-6 cursor-pointer rounded p-1.5 text-xs font-semibold transition-colors sm:inline-flex',
+                                    gridColumns === col ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                                ]"
+                            >
+                                {{ col }}
+                            </button>
+                        </TitleTooltip>
                     </template>
                 </div>
             </div>
@@ -506,14 +517,14 @@ watch(loadMoreBtn, (btn) => {
                     :placeholder="t('news.search_placeholder')"
                     class="h-8 w-full rounded-lg border border-border bg-muted/40 pr-8 pl-8 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary focus:outline-none"
                 />
-                <button
-                    v-if="searchQuery"
-                    @click="clearSearch"
-                    class="absolute right-2 cursor-pointer text-muted-foreground hover:text-foreground"
-                    :title="t('general.clear_search')"
-                >
-                    <X class="h-3.5 w-3.5" />
-                </button>
+                <TitleTooltip v-if="searchQuery" :title="t('general.clear_search')">
+                    <button
+                        @click="clearSearch"
+                        class="absolute right-2 cursor-pointer text-muted-foreground hover:text-foreground"
+                    >
+                        <X class="h-3.5 w-3.5" />
+                    </button>
+                </TitleTooltip>
             </div>
         </div>
 
@@ -619,25 +630,27 @@ watch(loadMoreBtn, (btn) => {
                                         <span v-if="article.published_at" class="shrink-0">{{ formatDate(article.published_at) }}</span>
                                     </div>
                                     <div class="flex shrink-0 items-center gap-2">
-                                        <a
-                                            :href="article.link"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="flex cursor-pointer items-center gap-1 hover:text-foreground"
-                                            :title="t('general.read_more')"
-                                            @click.stop
-                                        >
-                                            <ExternalLink class="h-4 w-4" />
-                                        </a>
-                                        <button
-                                            @click.stop="toggleSave(article)"
-                                            :disabled="isSaving(article.id)"
-                                            class="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary disabled:cursor-not-allowed"
-                                            :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')"
-                                        >
-                                            <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
-                                            <Bookmark v-else class="h-4 w-4" />
-                                        </button>
+                                        <TitleTooltip :title="t('general.read_more')">
+                                            <a
+                                                :href="article.link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="flex cursor-pointer items-center gap-1 hover:text-foreground"
+                                                @click.stop
+                                            >
+                                                <ExternalLink class="h-4 w-4" />
+                                            </a>
+                                        </TitleTooltip>
+                                        <TitleTooltip :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')">
+                                            <button
+                                                @click.stop="toggleSave(article)"
+                                                :disabled="isSaving(article.id)"
+                                                class="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary disabled:cursor-not-allowed"
+                                            >
+                                                <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
+                                                <Bookmark v-else class="h-4 w-4" />
+                                            </button>
+                                        </TitleTooltip>
                                     </div>
                                 </div>
                             </div>
@@ -770,25 +783,27 @@ watch(loadMoreBtn, (btn) => {
                                             <span v-if="article.published_at" class="shrink-0">{{ formatDate(article.published_at) }}</span>
                                         </div>
                                         <div class="flex shrink-0 items-center gap-2">
-                                            <a
-                                                :href="article.link"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="flex cursor-pointer items-center gap-1 hover:text-foreground"
-                                                :title="t('general.read_more')"
-                                                @click.stop
-                                            >
-                                                <ExternalLink class="h-4 w-4" />
-                                            </a>
-                                            <button
-                                                @click.stop="toggleSave(article)"
-                                                :disabled="isSaving(article.id)"
-                                                class="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary disabled:cursor-not-allowed"
-                                                :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')"
-                                            >
-                                                <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
-                                                <Bookmark v-else class="h-4 w-4" />
-                                            </button>
+                                            <TitleTooltip :title="t('general.read_more')">
+                                                <a
+                                                    :href="article.link"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="flex cursor-pointer items-center gap-1 hover:text-foreground"
+                                                    @click.stop
+                                                >
+                                                    <ExternalLink class="h-4 w-4" />
+                                                </a>
+                                            </TitleTooltip>
+                                            <TitleTooltip :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')">
+                                                <button
+                                                    @click.stop="toggleSave(article)"
+                                                    :disabled="isSaving(article.id)"
+                                                    class="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary disabled:cursor-not-allowed"
+                                                >
+                                                    <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
+                                                    <Bookmark v-else class="h-4 w-4" />
+                                                </button>
+                                            </TitleTooltip>
                                         </div>
                                     </div>
                                 </div>
@@ -899,14 +914,15 @@ watch(loadMoreBtn, (btn) => {
             >
                 <div class="flex w-full max-w-3xl items-center gap-2 md:gap-3">
                     <!-- Prev arrow -->
-                    <button
-                        @click.stop="goToPrev"
-                        :disabled="readerIndex <= 0"
-                        class="shrink-0 cursor-pointer rounded-full bg-background/90 p-2.5 shadow-lg backdrop-blur-sm transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-30"
-                        :title="t('general.previous')"
-                    >
-                        <ChevronLeft class="h-5 w-5" />
-                    </button>
+                    <TitleTooltip :title="t('general.previous')" side="right">
+                        <button
+                            @click.stop="goToPrev"
+                            :disabled="readerIndex <= 0"
+                            class="shrink-0 cursor-pointer rounded-full bg-background/90 p-2.5 shadow-lg backdrop-blur-sm transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                            <ChevronLeft class="h-5 w-5" />
+                        </button>
+                    </TitleTooltip>
 
                     <!-- Modal panel -->
                     <div class="max-h-[90vh] min-w-0 flex-1 overflow-y-auto rounded-xl border border-border bg-background shadow-2xl" @click.stop>
@@ -939,39 +955,42 @@ watch(loadMoreBtn, (btn) => {
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
                                 <!-- Full body toggle -->
-                                <button
-                                    @click="toggleFullBody"
-                                    :class="[
-                                        'cursor-pointer rounded-lg p-1.5 transition-colors',
-                                        showFullBody
-                                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                                    ]"
-                                    :title="showFullBody ? t('news.switch_to_description') : t('news.switch_to_full_body')"
-                                >
-                                    <BookOpen class="h-4 w-4" />
-                                </button>
+                                <TitleTooltip :title="showFullBody ? t('news.switch_to_description') : t('news.switch_to_full_body')">
+                                    <button
+                                        @click="toggleFullBody"
+                                        :class="[
+                                            'cursor-pointer rounded-lg p-1.5 transition-colors',
+                                            showFullBody
+                                                ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                                        ]"
+                                    >
+                                        <BookOpen class="h-4 w-4" />
+                                    </button>
+                                </TitleTooltip>
                                 <!-- Raw mode toggle -->
-                                <button
-                                    @click="rawMode = !rawMode"
-                                    :class="[
-                                        'cursor-pointer rounded-lg p-1.5 transition-colors',
-                                        rawMode
-                                            ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                                    ]"
-                                    :title="rawMode ? t('news.switch_to_formatted') : t('news.switch_to_raw')"
-                                >
-                                    <Code2 v-if="rawMode" class="h-4 w-4" />
-                                    <FileText v-else class="h-4 w-4" />
-                                </button>
-                                <button
-                                    @click="readerArticle = null"
-                                    class="shrink-0 cursor-pointer rounded-lg p-1.5 hover:bg-muted"
-                                    :title="t('general.close')"
-                                >
-                                    <X class="h-5 w-5" />
-                                </button>
+                                <TitleTooltip :title="rawMode ? t('news.switch_to_formatted') : t('news.switch_to_raw')">
+                                    <button
+                                        @click="rawMode = !rawMode"
+                                        :class="[
+                                            'cursor-pointer rounded-lg p-1.5 transition-colors',
+                                            rawMode
+                                                ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                                        ]"
+                                    >
+                                        <Code2 v-if="rawMode" class="h-4 w-4" />
+                                        <FileText v-else class="h-4 w-4" />
+                                    </button>
+                                </TitleTooltip>
+                                <TitleTooltip :title="t('general.close')">
+                                    <button
+                                        @click="readerArticle = null"
+                                        class="shrink-0 cursor-pointer rounded-lg p-1.5 hover:bg-muted"
+                                    >
+                                        <X class="h-5 w-5" />
+                                    </button>
+                                </TitleTooltip>
                             </div>
                         </div>
 
@@ -1047,14 +1066,15 @@ watch(loadMoreBtn, (btn) => {
                     <!-- end modal panel -->
 
                     <!-- Next arrow -->
-                    <button
-                        @click.stop="goToNext"
-                        :disabled="readerIndex >= articles.length - 1"
-                        class="shrink-0 cursor-pointer rounded-full bg-background/90 p-2.5 shadow-lg backdrop-blur-sm transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-30"
-                        :title="t('general.next')"
-                    >
-                        <ChevronRight class="h-5 w-5" />
-                    </button>
+                    <TitleTooltip :title="t('general.next')" side="left">
+                        <button
+                            @click.stop="goToNext"
+                            :disabled="readerIndex >= articles.length - 1"
+                            class="shrink-0 cursor-pointer rounded-full bg-background/90 p-2.5 shadow-lg backdrop-blur-sm transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-30"
+                        >
+                            <ChevronRight class="h-5 w-5" />
+                        </button>
+                    </TitleTooltip>
                 </div>
             </div>
         </Teleport>

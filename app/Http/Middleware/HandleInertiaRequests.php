@@ -3,11 +3,13 @@
 namespace App\Http\Middleware;
 
 use App\Models\Feed;
+use App\Models\Setting;
 use Inertia\Middleware;
 use App\Models\Category;
 use Tighten\Ziggy\Ziggy;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Inspiring;
+use App\Domains\Settings\Support\LocaleDetector;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -54,6 +56,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'appearance' => $request->cookie('appearance', 'system'),
+            'locale' => LocaleDetector::resolve($request->user()?->locale ?? Setting::get('locale')),
+            'availableLocales' => LocaleDetector::availableWithMetadata()->values()->all(),
             'sidebarCategories' => $request->user()
                 ? Category::query()->orderBy('name')->get(['id', 'name'])
                 : [],

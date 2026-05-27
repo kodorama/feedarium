@@ -2,13 +2,16 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Setting;
 use Filament\Pages\Page;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
 use Illuminate\Validation\Rules\Password;
 use App\Domains\News\Jobs\FlushScoutIndexJob;
 use App\Domains\News\Jobs\ImportScoutIndexJob;
 use App\Domains\News\Jobs\SyncScoutSettingsJob;
+use App\Domains\Settings\Support\LocaleDetector;
 use App\Domains\User\Jobs\UpdateAdminPasswordJob;
 
 final class AdminSettings extends Page
@@ -50,8 +53,16 @@ final class AdminSettings extends Page
     public function mount(): void
     {
         $this->theme = request()->cookie('appearance', 'system');
-        $this->language = config('app.locale', 'en');
+        $this->language = LocaleDetector::resolve(Setting::get('locale'));
         $this->timezone = config('app.timezone', 'UTC');
+    }
+
+    /**
+     * @return array<string, array{code: string, name: string, native: string, rtl: bool}>
+     */
+    public function getAvailableLocalesProperty(): array
+    {
+        return LocaleDetector::availableWithMetadata()->keyBy('code')->all();
     }
 
     public function saveTheme(): void
@@ -63,10 +74,13 @@ final class AdminSettings extends Page
 
     public function saveLanguage(): void
     {
-        $this->validate(['language' => ['required', 'string', 'max:10']]);
-        Notification::make()
-            ->title('Language preference noted (update APP_LOCALE in .env to persist)')
-            ->success()->send();
+        $this->validate([
+            'language' => ['required', 'string', Rule::in(LocaleDetector::available()->all())],
+        ]);
+
+        Setting::set('locale', $this->language);
+
+        Notification::make()->title('Language saved successfully')->success()->send();
     }
 
     public function saveTimezone(): void

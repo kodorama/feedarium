@@ -18,6 +18,7 @@ import { useAutoAdvance } from '@/composables/useAutoAdvance';
 import { useReadStatus } from '@/composables/useReadStatus';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from '@/lib/axios';
+import { TitleTooltip } from '@/components/ui/tooltip';
 import { Bookmark, CheckCheck, ChevronRight, FolderOpen, LogOut, Rss, Settings, Settings2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -243,13 +244,14 @@ watch(markAllSignal, (sig) => {
                                 <span class="relative h-4 w-4 shrink-0">
                                     <img v-if="feed.favicon_url" :src="feed.favicon_url" class="h-4 w-4 rounded-sm object-contain transition-opacity group-hover:opacity-0" alt="" />
                                     <Rss v-else class="h-4 w-4 opacity-60 transition-opacity group-hover:opacity-0" />
-                                    <span
-                                        class="absolute inset-0 flex cursor-pointer items-center justify-center rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
-                                        :title="t('feeds.customize')"
-                                        @click.stop="openCustomize(feed)"
-                                    >
-                                        <Settings2 class="h-3.5 w-3.5 text-muted-foreground" />
-                                    </span>
+                                    <TitleTooltip :title="t('feeds.customize')" side="top">
+                                        <span
+                                            class="absolute inset-0 flex cursor-pointer items-center justify-center rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+                                            @click.stop="openCustomize(feed)"
+                                        >
+                                            <Settings2 class="h-3.5 w-3.5 text-muted-foreground" />
+                                        </span>
+                                    </TitleTooltip>
                                 </span>
                                 <span class="flex-1 truncate text-left">{{ feed.name }}</span>
                                 <span
@@ -258,13 +260,14 @@ watch(markAllSignal, (sig) => {
                                 >
                                     {{ feedUnread(feed) > 99 ? '99+' : feedUnread(feed) }}
                                 </span>
-                                <span
-                                    class="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                    :title="t('general.mark_all_read')"
-                                    @click="markAllForFeed($event, feed.id)"
-                                >
-                                    <CheckCheck class="h-3.5 w-3.5" />
-                                </span>
+                                <TitleTooltip :title="t('general.mark_all_read')" side="top">
+                                    <span
+                                        class="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        @click="markAllForFeed($event, feed.id)"
+                                    >
+                                        <CheckCheck class="h-3.5 w-3.5" />
+                                    </span>
+                                </TitleTooltip>
                             </button>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -287,13 +290,14 @@ watch(markAllSignal, (sig) => {
                                     >
                                         {{ (categoryUnread.get(category.id) ?? 0) > 99 ? '99+' : categoryUnread.get(category.id) }}
                                     </span>
-                                    <span
-                                        class="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                        :title="t('general.mark_all_read')"
-                                        @click="markAllForCategory($event, category.id)"
-                                    >
-                                        <CheckCheck class="h-3.5 w-3.5" />
-                                    </span>
+                                    <TitleTooltip :title="t('general.mark_all_read')" side="top">
+                                        <span
+                                            class="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            @click="markAllForCategory($event, category.id)"
+                                        >
+                                            <CheckCheck class="h-3.5 w-3.5" />
+                                        </span>
+                                    </TitleTooltip>
                                     <CollapsibleTrigger as-child>
                                         <span class="shrink-0 rounded p-0.5 hover:bg-muted" @click.stop>
                                             <ChevronRight
@@ -317,13 +321,14 @@ watch(markAllSignal, (sig) => {
                                                         alt=""
                                                     />
                                                     <Rss v-else class="h-3.5 w-3.5 opacity-60 transition-opacity group-hover:opacity-0" />
-                                                    <span
-                                                        class="absolute inset-0 flex cursor-pointer items-center justify-center rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
-                                                        :title="t('feeds.customize')"
-                                                        @click.stop="openCustomize(feed)"
-                                                    >
-                                                        <Settings2 class="h-3 w-3 text-muted-foreground" />
-                                                    </span>
+                                                    <TitleTooltip :title="t('feeds.customize')" side="top">
+                                                        <span
+                                                            class="absolute inset-0 flex cursor-pointer items-center justify-center rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+                                                            @click.stop="openCustomize(feed)"
+                                                        >
+                                                            <Settings2 class="h-3 w-3 text-muted-foreground" />
+                                                        </span>
+                                                    </TitleTooltip>
                                                 </span>
                                                 <span class="flex-1 truncate text-left">{{ feed.name }}</span>
                                                 <span
@@ -332,13 +337,14 @@ watch(markAllSignal, (sig) => {
                                                 >
                                                     {{ feedUnread(feed) > 99 ? '99+' : feedUnread(feed) }}
                                                 </span>
-                                                <span
-                                                    class="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                    :title="t('general.mark_all_read')"
-                                                    @click="markAllForFeed($event, feed.id)"
-                                                >
-                                                    <CheckCheck class="h-3 w-3" />
-                                                </span>
+                                                <TitleTooltip :title="t('general.mark_all_read')" side="top">
+                                                    <span
+                                                        class="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                        @click="markAllForFeed($event, feed.id)"
+                                                    >
+                                                        <CheckCheck class="h-3 w-3" />
+                                                    </span>
+                                                </TitleTooltip>
                                             </button>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>

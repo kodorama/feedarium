@@ -17,18 +17,29 @@ export interface NavItem {
     isActive?: boolean;
 }
 
+export interface LocaleMeta {
+    code: string;
+    name: string;
+    native: string;
+    rtl: boolean;
+}
+
 export type AppPageProps<T extends Record<string, unknown> = Record<string, unknown>> = T & {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
     ziggy: Config & { location: string };
     sidebarOpen: boolean;
+    locale: string;
+    availableLocales: LocaleMeta[];
 };
 
 export interface User {
     id: number;
     name: string;
     email: string;
+    locale: string | null;
+    timezone: string | null;
     avatar?: string;
     email_verified_at: string | null;
     is_admin: boolean;

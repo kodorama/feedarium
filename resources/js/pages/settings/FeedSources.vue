@@ -3,21 +3,22 @@ import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TitleTooltip } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Check, Pencil, Plus, Rss, ToggleLeft, ToggleRight, Trash2, X } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Feed Sources', href: '/settings/feeds' },
-];
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: t('settings.breadcrumb.settings'), href: '/settings/profile' },
+    { title: t('settings.breadcrumb.feeds'), href: '/settings/feeds' },
+]);
 
 interface Category {
     id: number;
@@ -91,7 +92,7 @@ async function createFeed() {
         feeds.value.unshift(res.data.feed);
         addForm.value = emptyForm();
         showAddForm.value = false;
-        showToast('success', 'Feed source added successfully.');
+        showToast('success', t('settings.feeds.created'));
     } catch (e: any) {
         if (e.response?.status === 422) {
             const errs = e.response.data.errors ?? {};
@@ -99,7 +100,7 @@ async function createFeed() {
                 errors.value[`add_${k}`] = errs[k][0];
             });
         } else {
-            showToast('error', 'Failed to add feed source. Please try again.');
+            showToast('error', t('settings.feeds.create_failed'));
         }
     } finally {
         saving.value = false;
@@ -141,7 +142,7 @@ async function saveEdit(id: number) {
             feeds.value[idx] = res.data.feed;
         }
         editingId.value = null;
-        showToast('success', 'Feed source updated successfully.');
+        showToast('success', t('settings.feeds.updated'));
     } catch (e: any) {
         if (e.response?.status === 422) {
             const errs = e.response.data.errors ?? {};
@@ -149,7 +150,7 @@ async function saveEdit(id: number) {
                 errors.value[`edit_${k}`] = errs[k][0];
             });
         } else {
-            showToast('error', 'Failed to update feed source. Please try again.');
+            showToast('error', t('settings.feeds.update_failed'));
         }
     } finally {
         saving.value = false;
@@ -161,9 +162,9 @@ async function toggleFeed(feed: Feed) {
     try {
         await axios.patch(`/api/feeds/${feed.id}/toggle`);
         feed.active = !feed.active;
-        showToast('success', feed.active ? 'Feed activated.' : 'Feed deactivated.');
+        showToast('success', feed.active ? t('settings.feeds.activated') : t('settings.feeds.deactivated'));
     } catch {
-        showToast('error', 'Failed to toggle feed status.');
+        showToast('error', t('settings.feeds.toggle_failed'));
     } finally {
         toggling.value = null;
     }
@@ -177,9 +178,9 @@ async function deleteFeed(id: number) {
     try {
         await axios.delete(`/api/feeds/${id}`);
         feeds.value = feeds.value.filter((f) => f.id !== id);
-        showToast('success', 'Feed source deleted.');
+        showToast('success', t('settings.feeds.deleted'));
     } catch {
-        showToast('error', 'Failed to delete feed source.');
+        showToast('error', t('settings.feeds.delete_failed'));
     } finally {
         deleting.value = null;
     }
@@ -217,46 +218,46 @@ onMounted(loadData);
                 </Transition>
 
                 <div class="flex items-center justify-between">
-                    <HeadingSmall title="Feed Sources" description="Add RSS/Atom feeds to follow." />
+                    <HeadingSmall :title="t('settings.feeds.title')" :description="t('settings.feeds.description')" />
                     <Button size="sm" variant="outline" @click="showAddForm = !showAddForm">
                         <Plus class="mr-1 h-4 w-4" />
-                        Add
+                        {{ t('settings.feeds.add') }}
                     </Button>
                 </div>
 
                 <!-- Add form -->
                 <form v-if="showAddForm" @submit.prevent="createFeed" class="space-y-3 rounded-lg border border-border bg-muted/40 p-4">
                     <div class="grid gap-1.5">
-                        <Label for="add-name">Name *</Label>
+                        <Label for="add-name">{{ t('settings.feeds.name_label') }}</Label>
                         <Input id="add-name" v-model="addForm.name" placeholder="My Blog" required />
                         <p v-if="errors.add_name" class="text-xs text-destructive">{{ errors.add_name }}</p>
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="add-url">Feed URL *</Label>
+                        <Label for="add-url">{{ t('settings.feeds.url_label') }}</Label>
                         <Input id="add-url" v-model="addForm.url" type="url" placeholder="https://example.com/rss" required />
                         <p v-if="errors.add_url" class="text-xs text-destructive">{{ errors.add_url }}</p>
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="add-category">Category</Label>
+                        <Label for="add-category">{{ t('settings.feeds.category_label') }}</Label>
                         <select
                             id="add-category"
                             v-model="addForm.category_id"
                             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
-                            <option value="">— None —</option>
+                            <option value="">{{ t('settings.feeds.none_option') }}</option>
                             <option v-for="cat in categories" :key="cat.id" :value="String(cat.id)">{{ cat.name }}</option>
                         </select>
                     </div>
                     <div class="grid gap-1.5">
-                        <Label for="add-desc">Description</Label>
-                        <Input id="add-desc" v-model="addForm.description" placeholder="Optional description" />
+                        <Label for="add-desc">{{ t('settings.feeds.description_label') }}</Label>
+                        <Input id="add-desc" v-model="addForm.description" :placeholder="t('settings.categories.description_placeholder')" />
                     </div>
                     <div class="flex items-center gap-2">
                         <input id="add-active" type="checkbox" v-model="addForm.active" class="h-4 w-4" />
-                        <Label for="add-active" class="font-normal">Active</Label>
+                        <Label for="add-active" class="font-normal">{{ t('settings.feeds.active_label') }}</Label>
                     </div>
                     <div class="flex gap-2">
-                        <Button type="submit" size="sm" :disabled="saving">Save</Button>
+                        <Button type="submit" size="sm" :disabled="saving">{{ t('general.save') }}</Button>
                         <Button
                             type="button"
                             size="sm"
@@ -265,7 +266,7 @@ onMounted(loadData);
                                 showAddForm = false;
                                 errors = {};
                             "
-                            >Cancel</Button
+                            >{{ t('general.cancel') }}</Button
                         >
                     </div>
                 </form>
@@ -276,7 +277,7 @@ onMounted(loadData);
                 <!-- Empty state -->
                 <div v-else-if="feeds.length === 0" class="py-8 text-center text-sm text-muted-foreground">
                     <Rss class="mx-auto mb-2 h-8 w-8 opacity-40" />
-                    <p>No feed sources yet. Add one to get started.</p>
+                    <p>{{ t('settings.feeds.no_items') }}</p>
                 </div>
 
                 <!-- List -->
@@ -289,21 +290,21 @@ onMounted(loadData);
                                 <p v-if="errors.edit_name" class="text-xs text-destructive">{{ errors.edit_name }}</p>
                             </div>
                             <div class="grid gap-1">
-                                <Input v-model="editForm.url" type="url" placeholder="Feed URL" required />
+                                <Input v-model="editForm.url" type="url" :placeholder="t('feeds.url')" required />
                                 <p v-if="errors.edit_url" class="text-xs text-destructive">{{ errors.edit_url }}</p>
                             </div>
                             <select v-model="editForm.category_id" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                                <option value="">— None —</option>
+                                <option value="">{{ t('settings.feeds.none_option') }}</option>
                                 <option v-for="cat in categories" :key="cat.id" :value="String(cat.id)">{{ cat.name }}</option>
                             </select>
-                            <Input v-model="editForm.description" placeholder="Description (optional)" />
+                            <Input v-model="editForm.description" :placeholder="t('settings.categories.description_placeholder')" />
                             <div class="flex items-center gap-2">
                                 <input id="edit-active" type="checkbox" v-model="editForm.active" class="h-4 w-4" />
-                                <Label for="edit-active" class="text-sm font-normal">Active</Label>
+                                <Label for="edit-active" class="text-sm font-normal">{{ t('settings.feeds.active_label') }}</Label>
                             </div>
                             <div class="flex gap-2">
-                                <Button type="submit" size="sm" :disabled="saving"> <Check class="mr-1 h-4 w-4" /> Save </Button>
-                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit"> <X class="mr-1 h-4 w-4" /> Cancel </Button>
+                                <Button type="submit" size="sm" :disabled="saving"> <Check class="mr-1 h-4 w-4" /> {{ t('general.save') }} </Button>
+                                <Button type="button" size="sm" variant="ghost" @click="cancelEdit"> <X class="mr-1 h-4 w-4" /> {{ t('general.cancel') }} </Button>
                             </div>
                         </form>
 
@@ -322,20 +323,21 @@ onMounted(loadData);
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-medium">{{ feed.name }}</p>
                                     <p class="truncate text-xs text-muted-foreground">
-                                        {{ feed.category?.name ?? 'Uncategorized' }} · {{ feed.url }}
+                                        {{ feed.category?.name ?? t('settings.feeds.uncategorized') }} · {{ feed.url }}
                                     </p>
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
-                                <button
-                                    @click="toggleFeed(feed)"
-                                    :disabled="toggling === feed.id"
-                                    class="text-muted-foreground hover:text-foreground"
-                                    :title="feed.active ? 'Deactivate' : 'Activate'"
-                                >
-                                    <ToggleRight v-if="feed.active" class="h-5 w-5 text-primary" />
-                                    <ToggleLeft v-else class="h-5 w-5" />
-                                </button>
+                                <TitleTooltip :title="feed.active ? t('settings.feeds.deactivate_title') : t('settings.feeds.activate_title')" side="top">
+                                    <button
+                                        @click="toggleFeed(feed)"
+                                        :disabled="toggling === feed.id"
+                                        class="text-muted-foreground hover:text-foreground"
+                                    >
+                                        <ToggleRight v-if="feed.active" class="h-5 w-5 text-primary" />
+                                        <ToggleLeft v-else class="h-5 w-5" />
+                                    </button>
+                                </TitleTooltip>
                                 <Button size="icon" variant="ghost" class="h-8 w-8" @click="startEdit(feed)">
                                     <Pencil class="h-4 w-4" />
                                 </Button>

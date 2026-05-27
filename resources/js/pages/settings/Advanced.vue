@@ -9,17 +9,16 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { Check, X } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
-import { useI18n } from 'vue-i18n';
+import { computed, onMounted, ref } from 'vue';import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const page = usePage();
 const isAdmin = computed(() => (page.props.auth?.user as any)?.is_admin === true);
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Settings', href: '/settings/profile' },
-    { title: 'Advanced', href: '/settings/advanced' },
-];
+const breadcrumbs = computed<BreadcrumbItem[]>(() => [
+    { title: t('settings.breadcrumb.settings'), href: '/settings/profile' },
+    { title: t('settings.breadcrumb.advanced'), href: '/settings/advanced' },
+]);
 
 interface Toast {
     type: 'success' | 'error';
@@ -156,7 +155,7 @@ onMounted(loadSettings);
                 </template>
 
                 <template v-else>
-                    <p class="text-sm text-muted-foreground">Advanced settings are available to administrators only.</p>
+                    <p class="text-sm text-muted-foreground">{{ t('settings.advanced.admin_only') }}</p>
                 </template>
             </div>
         </SettingsLayout>

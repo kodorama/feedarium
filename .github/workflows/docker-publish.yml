@@ -10,34 +10,17 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
-    name: Build & Push to GHCR
+  metadata:
+    name: Prepare Docker metadata
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Enables building linux/arm64 images on the amd64 runner (Raspberry Pi / CasaOS support)
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Generates tags:
-      #   release v1.2.3 → ghcr.io/owner/feedarium:1.2.3, :1.2, :1, :latest
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -49,16 +32,86 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest
 
-      - name: Build and push Docker image
+      - name: Extract image version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=manual-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            suffix: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push platform image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.prod
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # GitHub Actions cache keeps layer caches between runs for faster builds
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}-${{ matrix.suffix }}
+          labels: ${{ needs.metadata.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.suffix }}
 
+  manifest:
+    name: Create multi-arch manifest
+    needs:
+      - metadata
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifests
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          VERSION="${{ needs.metadata.outputs.version }}"
+
+          echo "${{ needs.metadata.outputs.tags }}" | while read -r TAG; do
+            [ -z "$TAG" ] && continue
+
+            docker buildx imagetools create \
+              --tag "$TAG" \
+              "$IMAGE:$VERSION-amd64" \
+              "$IMAGE:$VERSION-arm64"
+          done

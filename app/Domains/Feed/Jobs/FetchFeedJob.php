@@ -2,9 +2,12 @@
 
 namespace App\Domains\Feed\Jobs;
 
+use Throwable;
 use App\Models\Feed;
+use RuntimeException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
@@ -35,7 +38,13 @@ final class FetchFeedJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public int $backoff = 60;
+    /**
+     * @return array<int, int>
+     */
+    public function backoff(): array
+    {
+        return [60, 300, 900];
+    }
 
     public function __construct(public readonly int $feedId) {}
 
@@ -55,14 +64,26 @@ final class FetchFeedJob implements ShouldQueue
 
         try {
             $response = Http::withHeaders($headers)
-                ->withUserAgent('Feedarium/1.0 (+https://github.com/kodorama/feedarium)')
+                ->withUserAgent(
+                    'Feedarium/1.0 (+https://github.com/kodorama/feedarium)'
+                )
+                ->connectTimeout(15)
                 ->timeout(30)
-                ->withOptions(['curl' => [CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1]])
+                ->withOptions([
+                    'curl' => [
+                        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    ],
+                ])
                 ->get($feed->url);
-        } catch (ConnectionException $e) {
-            Log::warning("FetchFeedJob: connection error for feed {$this->feedId}: {$e->getMessage()}");
+        } catch (ConnectionException $exception) {
+            Log::warning('FetchFeedJob: connection error', [
+                'feed_id' => $this->feedId,
+                'url' => $feed->url,
+                'attempt' => $this->attempts(),
+                'error' => $exception->getMessage(),
+            ]);
 
-            return;
+            throw $exception;
         }
 
         // 304 Not Modified — skip import, just update last_fetched_at
@@ -75,6 +96,8 @@ final class FetchFeedJob implements ShouldQueue
         }
 
         if (! $response->successful()) {
+            $this->handleUnsuccessfulResponse($feed, $response);
+
             return;
         }
 
@@ -85,5 +108,43 @@ final class FetchFeedJob implements ShouldQueue
         ]);
 
         ImportFeedItemsJob::dispatch($this->feedId, $response->body());
+    }
+
+    private function handleUnsuccessfulResponse(
+        Feed $feed,
+        Response $response,
+    ): void {
+        Log::warning('FetchFeedJob: unsuccessful response', [
+            'feed_id' => $this->feedId,
+            'url' => $feed->url,
+            'status' => $response->status(),
+            'attempt' => $this->attempts(),
+        ]);
+
+        if ($this->isRetryableStatus($response->status())) {
+            throw new RuntimeException(
+                "Temporary HTTP {$response->status()} while fetching feed {$this->feedId}."
+            );
+        }
+    }
+
+    private function isRetryableStatus(int $status): bool
+    {
+        return in_array($status, [
+            408,
+            429,
+            500,
+            502,
+            503,
+            504,
+        ], true);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        Log::error('FetchFeedJob: exhausted all attempts', [
+            'feed_id' => $this->feedId,
+            'error' => $exception?->getMessage(),
+        ]);
     }
 }

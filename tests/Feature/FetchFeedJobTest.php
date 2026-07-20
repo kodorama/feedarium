@@ -2,6 +2,7 @@
 
 use App\Models\Feed;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use App\Domains\Feed\Jobs\FetchFeedJob;
@@ -44,26 +45,64 @@ describe('FetchFeedJob', function () {
         expect($feed->fresh()->last_fetched_at)->not->toBeNull();
     });
 
-    it('skips import on non-successful response', function () {
-        $feed = Feed::factory()->create(['active' => true, 'url' => 'https://example.com/feed.xml']);
+    it('rethrows temporary HTTP errors so the queue retries the job', function () {
+        Log::spy();
+
+        $feed = Feed::factory()->create([
+            'active' => true,
+            'url' => 'https://example.com/feed.xml',
+        ]);
 
         Http::fake([
             'example.com/feed.xml' => Http::response('', 500),
         ]);
 
-        (new FetchFeedJob($feed->id))->handle();
+        expect(fn () => (new FetchFeedJob($feed->id))->handle())
+            ->toThrow(RuntimeException::class);
+
+        Log::shouldHaveReceived('warning')
+            ->once();
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
     });
 
-    it('logs a warning and skips cleanly on connection error', function () {
-        $feed = Feed::factory()->create(['active' => true, 'url' => 'https://example.com/feed.xml']);
+    it('logs and rethrows connection errors so the queue can retry the job', function () {
+        Log::spy();
+
+        $feed = Feed::factory()->create([
+            'active' => true,
+            'url' => 'https://example.com/feed.xml',
+        ]);
 
         Http::fake([
             '*' => static fn () => throw new ConnectionException('Simulated WAF drop / SSL EOF'),
         ]);
 
-        expect(fn () => (new FetchFeedJob($feed->id))->handle())->not->toThrow(Exception::class);
+        expect(fn () => (new FetchFeedJob($feed->id))->handle())
+            ->toThrow(ConnectionException::class);
+
+        Log::shouldHaveReceived('warning')
+            ->once();
+
+        Queue::assertNotPushed(ImportFeedItemsJob::class);
+    });
+
+    it('does not retry permanent HTTP errors', function () {
+        Log::spy();
+
+        $feed = Feed::factory()->create([
+            'active' => true,
+            'url' => 'https://example.com/feed.xml',
+        ]);
+
+        Http::fake([
+            'example.com/feed.xml' => Http::response('', 404),
+        ]);
+
+        (new FetchFeedJob($feed->id))->handle();
+
+        Log::shouldHaveReceived('warning')
+            ->once();
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
     });

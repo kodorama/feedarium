@@ -486,9 +486,9 @@ Distributed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](https:
 
 <a href="https://www.star-history.com/?repos=kodorama%2Ffeedarium&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&theme=dark&legend=top-left&sealed_token=4OhYw7y8E7iPDbMJGv4QB1LJw6p3d_vgCwJY0ta4CwlqA6bHIsmODoF1-9kmDEXtqP6SzSckbUtHmgGvpSY6y9sV_LxvQQ5CPrY_Wp-fOScSzmm5ti01xw" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&legend=top-left&sealed_token=4OhYw7y8E7iPDbMJGv4QB1LJw6p3d_vgCwJY0ta4CwlqA6bHIsmODoF1-9kmDEXtqP6SzSckbUtHmgGvpSY6y9sV_LxvQQ5CPrY_Wp-fOScSzmm5ti01xw" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kodorama/feedarium&type=date&legend=top-left&sealed_token=4OhYw7y8E7iPDbMJGv4QB1LJw6p3d_vgCwJY0ta4CwlqA6bHIsmODoF1-9kmDEXtqP6SzSckbUtHmgGvpSY6y9sV_LxvQQ5CPrY_Wp-fOScSzmm5ti01xw" />
  </picture>
 </a>
 

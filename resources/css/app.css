@@ -1,10 +1,13 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
 @plugin '@tailwindcss/typography';
 
-@import 'tw-animate-css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+@source '../js/**/*.{js,ts,vue}';
 
 @custom-variant dark (&:is(.dark *));
 

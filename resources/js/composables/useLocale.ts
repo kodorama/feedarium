@@ -15,7 +15,7 @@ export function useLocale() {
 
     // Apply locale immediately and whenever it changes via Inertia navigation.
     watch(
-        () => page.props.locale,
+        () => page.props?.locale,
         (incoming) => {
             if (incoming && incoming !== locale.value) {
                 locale.value = incoming;
@@ -24,9 +24,9 @@ export function useLocale() {
         { immediate: true },
     );
 
-    const availableLocales = (): LocaleMeta[] => page.props.availableLocales ?? [];
+    const availableLocales = (): LocaleMeta[] => page.props?.availableLocales ?? [];
 
-    const currentLocale = (): string => page.props.locale ?? 'en';
+    const currentLocale = (): string => page.props?.locale ?? 'en';
 
     return { availableLocales, currentLocale };
 }

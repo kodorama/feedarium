@@ -123,9 +123,7 @@ const customizeHideImage = ref(false);
 const customizeSaving = ref(false);
 const customizeSaved = ref(false);
 
-const selectedFeedEntry = computed<SidebarEntry | null>(
-    () => sidebarFeeds.value.find((f) => f.id === selectedFeedId.value) ?? null,
-);
+const selectedFeedEntry = computed<SidebarEntry | null>(() => sidebarFeeds.value.find((f) => f.id === selectedFeedId.value) ?? null);
 
 function openFeedCustomize(): void {
     if (!selectedFeedEntry.value) return;
@@ -492,12 +490,12 @@ watch(loadMoreBtn, (btn) => {
 
                     <!-- Column count — only visible in grid mode, numbers hidden on mobile portrait -->
                     <template v-if="viewMode === 'grid'">
-                        <div class="mx-1 hidden h-4 w-px shrink-0 bg-border sm:block" />
+                        <div class="mx-1 h-4 w-px shrink-0 bg-border max-sm:hidden sm:block" />
                         <TitleTooltip v-for="col in [2, 3, 4]" :key="col" :title="`${col} ${t('general.columns')}`">
                             <button
                                 @click="gridColumns = col"
                                 :class="[
-                                    'hidden min-w-6 cursor-pointer rounded p-1.5 text-xs font-semibold transition-colors sm:inline-flex',
+                                    'min-w-6 cursor-pointer rounded p-1.5 text-xs font-semibold transition-colors max-sm:hidden sm:inline-flex',
                                     gridColumns === col ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
                                 ]"
                             >
@@ -518,10 +516,7 @@ watch(loadMoreBtn, (btn) => {
                     class="h-8 w-full rounded-lg border border-border bg-muted/40 pr-8 pl-8 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary focus:outline-none"
                 />
                 <TitleTooltip v-if="searchQuery" :title="t('general.clear_search')">
-                    <button
-                        @click="clearSearch"
-                        class="absolute right-2 cursor-pointer text-muted-foreground hover:text-foreground"
-                    >
+                    <button @click="clearSearch" class="absolute right-2 cursor-pointer text-muted-foreground hover:text-foreground">
                         <X class="h-3.5 w-3.5" />
                     </button>
                 </TitleTooltip>
@@ -851,7 +846,9 @@ watch(loadMoreBtn, (btn) => {
         <Dialog v-model:open="customizeOpen">
             <DialogContent class="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{{ t('feeds.customize_title') }}<template v-if="selectedFeedEntry"> — {{ selectedFeedEntry.name }}</template></DialogTitle>
+                    <DialogTitle
+                        >{{ t('feeds.customize_title') }}<template v-if="selectedFeedEntry"> — {{ selectedFeedEntry.name }}</template></DialogTitle
+                    >
                 </DialogHeader>
 
                 <div class="space-y-5 py-2">
@@ -863,7 +860,7 @@ watch(loadMoreBtn, (btn) => {
                             class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
                         />
                         <label for="idx-customize-disable-scraping" class="cursor-pointer space-y-0.5">
-                            <span class="block text-sm font-medium leading-snug">{{ t('feeds.disable_scraping_label') }}</span>
+                            <span class="block text-sm leading-snug font-medium">{{ t('feeds.disable_scraping_label') }}</span>
                             <span class="block text-xs text-muted-foreground">{{ t('feeds.disable_scraping_desc') }}</span>
                         </label>
                     </div>
@@ -875,7 +872,7 @@ watch(loadMoreBtn, (btn) => {
                             class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
                         />
                         <label for="idx-customize-hide-image" class="cursor-pointer space-y-0.5">
-                            <span class="block text-sm font-medium leading-snug">{{ t('feeds.hide_image_label') }}</span>
+                            <span class="block text-sm leading-snug font-medium">{{ t('feeds.hide_image_label') }}</span>
                             <span class="block text-xs text-muted-foreground">{{ t('feeds.hide_image_desc') }}</span>
                         </label>
                     </div>
@@ -984,10 +981,7 @@ watch(loadMoreBtn, (btn) => {
                                     </button>
                                 </TitleTooltip>
                                 <TitleTooltip :title="t('general.close')">
-                                    <button
-                                        @click="readerArticle = null"
-                                        class="shrink-0 cursor-pointer rounded-lg p-1.5 hover:bg-muted"
-                                    >
+                                    <button @click="readerArticle = null" class="shrink-0 cursor-pointer rounded-lg p-1.5 hover:bg-muted">
                                         <X class="h-5 w-5" />
                                     </button>
                                 </TitleTooltip>
@@ -1014,7 +1008,11 @@ watch(loadMoreBtn, (btn) => {
                                 </div>
                                 <template v-else-if="hasContent(fullBodyContent ?? null)">
                                     <!-- eslint-disable vue/no-v-html -->
-                                    <div v-if="!rawMode" class="prose prose-sm max-w-none dark:prose-invert" v-html="getArticleContent(fullBodyContent ?? null)" />
+                                    <div
+                                        v-if="!rawMode"
+                                        class="prose prose-sm max-w-none dark:prose-invert"
+                                        v-html="getArticleContent(fullBodyContent ?? null)"
+                                    />
                                     <div
                                         v-else
                                         class="text-sm leading-relaxed whitespace-pre-wrap text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2"
@@ -1029,7 +1027,11 @@ watch(loadMoreBtn, (btn) => {
                             <template v-else>
                                 <template v-if="hasContent(readerArticle.description)">
                                     <!-- eslint-disable vue/no-v-html -->
-                                    <div v-if="!rawMode" class="prose prose-sm max-w-none dark:prose-invert" v-html="getArticleContent(readerArticle.description)" />
+                                    <div
+                                        v-if="!rawMode"
+                                        class="prose prose-sm max-w-none dark:prose-invert"
+                                        v-html="getArticleContent(readerArticle.description)"
+                                    />
                                     <div
                                         v-else
                                         class="text-sm leading-relaxed whitespace-pre-wrap text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2"

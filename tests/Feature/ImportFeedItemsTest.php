@@ -4,10 +4,10 @@ use App\Models\Feed;
 use App\Models\News;
 use App\Models\User;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+use App\Domains\News\Jobs\EnrichArticleJob;
 use App\Domains\Feed\Jobs\ImportFeedItemsJob;
-use App\Domains\News\Jobs\ScrapeArticleBodyJob;
-use App\Domains\News\Jobs\ScrapeArticleThumbnailJob;
 
 $rssXml = <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -59,29 +59,85 @@ describe('ImportFeedItemsJob', function () use ($rssXml) {
         expect(News::query()->where('feed_id', $feed->id)->count())->toBe(1);
     });
 
-    it('dispatches ScrapeArticleThumbnailJob for each new item', function () use ($rssXml) {
+    it('dispatches one unified enrichment job for an article without an image', function () use ($rssXml) {
         $feed = Feed::factory()->create();
 
         (new ImportFeedItemsJob($feed->id, $rssXml))->handle();
 
-        Queue::assertPushed(ScrapeArticleThumbnailJob::class, 1);
+        Queue::assertPushed(EnrichArticleJob::class, 1);
     });
 
-    it('skips ScrapeArticleBodyJob when feed has disable_full_article_scraping enabled', function () use ($rssXml) {
+    it('still enriches a missing thumbnail when body scraping is disabled for the feed', function () use ($rssXml) {
         Setting::set('scrape_full_body', 'true');
         $feed = Feed::factory()->create(['disable_full_article_scraping' => true]);
 
         (new ImportFeedItemsJob($feed->id, $rssXml))->handle();
 
-        Queue::assertNotPushed(ScrapeArticleBodyJob::class);
+        Queue::assertPushed(EnrichArticleJob::class, 1);
     });
 
-    it('dispatches ScrapeArticleBodyJob when scraping enabled and feed override is off', function () use ($rssXml) {
+    it('dispatches one enrichment job when body scraping enabled and feed override is off', function () use ($rssXml) {
         Setting::set('scrape_full_body', 'true');
         $feed = Feed::factory()->create(['disable_full_article_scraping' => false]);
 
         (new ImportFeedItemsJob($feed->id, $rssXml))->handle();
 
-        Queue::assertPushed(ScrapeArticleBodyJob::class, 1);
+        Queue::assertPushed(EnrichArticleJob::class, 1);
+    });
+
+    it('keeps an RSS media thumbnail and avoids image-only enrichment', function () {
+        $feed = Feed::factory()->create();
+        $xml = '<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>x</title><item><title>A</title><link>https://example.com/a</link><guid>a</guid><media:thumbnail url="https://example.com/rss.jpg" /></item></channel></rss>';
+
+        (new ImportFeedItemsJob($feed->id, $xml))->handle();
+
+        expect(News::query()->where('feed_id', $feed->id)->first()->thumbnail_url)->toBe('https://example.com/rss.jpg');
+        Queue::assertNotPushed(EnrichArticleJob::class);
+    });
+
+    it('rejects non-http image links supplied by RSS metadata', function () {
+        $feed = Feed::factory()->create();
+        $xml = '<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>x</title><item><title>A</title><link>https://example.com/a</link><guid>a</guid><media:thumbnail url="javascript:alert(1)" /></item></channel></rss>';
+
+        (new ImportFeedItemsJob($feed->id, $xml))->handle();
+
+        expect(News::query()->where('feed_id', $feed->id)->first()->thumbnail_url)->toBeNull();
+        Queue::assertPushed(EnrichArticleJob::class, 1);
+    });
+
+    it('releases duplicate feed imports while the same feed import lock is held', function () {
+        config(['feedarium.publisher_throttle.cache_store' => 'array']);
+        $feed = Feed::factory()->create();
+        $lock = Cache::store('array')->lock('feedarium:work:import:feed:'.$feed->id, 180);
+        expect($lock->get())->toBeTrue();
+        $deferredJob = new class($feed->id)
+        {
+            public int $releasedFor = 0;
+
+            public function __construct(public int $feedId) {}
+
+            public function publisherWorkKey(): string
+            {
+                return 'import:feed:'.$this->feedId;
+            }
+
+            public function publisherWorkLockExpiresAfter(): int
+            {
+                return 180;
+            }
+
+            public function release(int $delay): void
+            {
+                $this->releasedFor = $delay;
+            }
+        };
+        $ran = false;
+
+        app(\App\Domains\News\Jobs\WithoutOverlappingPublisherWork::class)->handle($deferredJob, function () use (&$ran): void {
+            $ran = true;
+        });
+        $lock->release();
+
+        expect($deferredJob->releasedFor)->toBe(5)->and($ran)->toBeFalse();
     });
 });

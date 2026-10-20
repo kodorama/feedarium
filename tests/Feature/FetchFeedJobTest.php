@@ -23,7 +23,7 @@ describe('FetchFeedJob', function () {
             'example.com/feed.xml' => Http::response('<rss></rss>', 200),
         ]);
 
-        (new FetchFeedJob($feed->id))->handle();
+        $this->app->call([new FetchFeedJob($feed->id), 'handle']);
 
         Queue::assertPushed(ImportFeedItemsJob::class, fn ($job) => $job->feedId === $feed->id);
     });
@@ -39,7 +39,7 @@ describe('FetchFeedJob', function () {
             'example.com/feed.xml' => Http::response('', 304),
         ]);
 
-        (new FetchFeedJob($feed->id))->handle();
+        $this->app->call([new FetchFeedJob($feed->id), 'handle']);
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
         expect($feed->fresh()->last_fetched_at)->not->toBeNull();
@@ -57,11 +57,27 @@ describe('FetchFeedJob', function () {
             'example.com/feed.xml' => Http::response('', 500),
         ]);
 
-        expect(fn () => (new FetchFeedJob($feed->id))->handle())
+        expect(fn () => $this->app->call([new FetchFeedJob($feed->id), 'handle']))
             ->toThrow(RuntimeException::class);
 
         Log::shouldHaveReceived('warning')
             ->once();
+
+        Queue::assertNotPushed(ImportFeedItemsJob::class);
+    });
+
+    it('releases the actual queue wrapper using a 429 Retry-After delay', function () {
+        config(['feedarium.publisher_throttle.cache_store' => 'array']);
+        \Illuminate\Support\Facades\Cache::store('array')->flush();
+        $feed = Feed::factory()->create(['active' => true, 'url' => 'https://example.com/feed.xml']);
+        Http::fake(['*' => Http::response('', 429, ['Retry-After' => '42'])]);
+        $queueJob = Mockery::mock(\Illuminate\Contracts\Queue\Job::class);
+        $queueJob->shouldReceive('attempts')->andReturn(1);
+        $queueJob->shouldReceive('release')->once()->with(42);
+        $job = new FetchFeedJob($feed->id);
+        $job->setJob($queueJob);
+
+        $this->app->call([$job, 'handle']);
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
     });
@@ -78,7 +94,7 @@ describe('FetchFeedJob', function () {
             '*' => static fn () => throw new ConnectionException('Simulated WAF drop / SSL EOF'),
         ]);
 
-        expect(fn () => (new FetchFeedJob($feed->id))->handle())
+        expect(fn () => $this->app->call([new FetchFeedJob($feed->id), 'handle']))
             ->toThrow(ConnectionException::class);
 
         Log::shouldHaveReceived('warning')
@@ -99,11 +115,21 @@ describe('FetchFeedJob', function () {
             'example.com/feed.xml' => Http::response('', 404),
         ]);
 
-        (new FetchFeedJob($feed->id))->handle();
+        $this->app->call([new FetchFeedJob($feed->id), 'handle']);
 
         Log::shouldHaveReceived('warning')
             ->once();
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
+    });
+
+    it('keeps only the feed identifier in its serialized queue payload', function () {
+        $job = new FetchFeedJob(123);
+        $payload = serialize($job);
+        $restored = unserialize($payload);
+
+        expect($restored)->toBeInstanceOf(FetchFeedJob::class)
+            ->and($restored->feedId)->toBe(123)
+            ->and($payload)->not->toContain('PublisherRequestGate');
     });
 });

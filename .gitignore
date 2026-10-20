@@ -24,3 +24,7 @@ yarn-error.log
 /.zed
 .DS_Store
 CHECKLIST.md
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

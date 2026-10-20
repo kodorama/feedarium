@@ -1,13 +1,14 @@
 export interface UnreadCountRequestToken {
     id: number;
     confirmedReads: Record<number, number>;
+    pendingReads: Record<number, number>;
     mutationRevisions: Record<number, number>;
 }
 
-export async function runOptimisticMutation(mutation: () => Promise<unknown>, onSuccess: () => void, onFailure: () => void): Promise<boolean> {
+export async function runOptimisticMutation<T>(mutation: () => Promise<T>, onSuccess: (result: T) => void, onFailure: () => void): Promise<boolean> {
     try {
-        await mutation();
-        onSuccess();
+        const result = await mutation();
+        onSuccess(result);
 
         return true;
     } catch {
@@ -35,17 +36,25 @@ export class FeedUnreadCountState {
     private snapshot: Map<number, number> | null = null;
     private readDeltas = new Map<number, number>();
     private confirmedReads = new Map<number, number>();
+    private pendingReads = new Map<number, number>();
     private zeroedFeeds = new Set<number>();
     private mutationRevisions = new Map<number, number>();
     private deferredSnapshotFeeds = new Set<number>();
+    private markAllRevisions = new Map<number, number>();
     private requestId = 0;
 
     addRead(feedId: number): void {
         this.readDeltas.set(feedId, (this.readDeltas.get(feedId) ?? 0) + 1);
+        this.pendingReads.set(feedId, (this.pendingReads.get(feedId) ?? 0) + 1);
         this.bumpMutationRevision(feedId);
     }
 
     confirmRead(feedId: number): void {
+        const pendingReads = this.pendingReads.get(feedId) ?? 0;
+        if (pendingReads === 0) return;
+
+        if (pendingReads === 1) this.pendingReads.delete(feedId);
+        else this.pendingReads.set(feedId, pendingReads - 1);
         this.confirmedReads.set(feedId, (this.confirmedReads.get(feedId) ?? 0) + 1);
         this.bumpMutationRevision(feedId);
     }
@@ -54,6 +63,9 @@ export class FeedUnreadCountState {
         const remainingReadDelta = (this.readDeltas.get(feedId) ?? 0) - 1;
         if (remainingReadDelta > 0) this.readDeltas.set(feedId, remainingReadDelta);
         else this.readDeltas.delete(feedId);
+        const pendingReads = this.pendingReads.get(feedId) ?? 0;
+        if (pendingReads <= 1) this.pendingReads.delete(feedId);
+        else this.pendingReads.set(feedId, pendingReads - 1);
         this.bumpMutationRevision(feedId);
     }
 
@@ -62,8 +74,35 @@ export class FeedUnreadCountState {
             this.zeroedFeeds.add(feedId);
             this.readDeltas.delete(feedId);
             this.confirmedReads.delete(feedId);
+            this.pendingReads.delete(feedId);
             this.bumpMutationRevision(feedId);
         }
+    }
+
+    applyAuthoritativeSnapshot(counts: Record<number, number>, affectedFeedIds: number[], requestRevision: number): boolean {
+        this.snapshot ??= new Map();
+        const affected = new Set(affectedFeedIds);
+        let applied = false;
+
+        for (const [feedIdText, count] of Object.entries(counts)) {
+            const feedId = Number(feedIdText);
+            if (!Number.isSafeInteger(feedId) || !affected.has(feedId)) continue;
+
+            const lastMarkAllRevision = this.markAllRevisions.get(feedId) ?? 0;
+            if (requestRevision < lastMarkAllRevision) continue;
+
+            this.snapshot.set(feedId, Math.max(0, Number(count) || 0));
+            this.markAllRevisions.set(feedId, requestRevision);
+            this.zeroedFeeds.delete(feedId);
+            this.readDeltas.delete(feedId);
+            this.confirmedReads.delete(feedId);
+            this.pendingReads.delete(feedId);
+            this.deferredSnapshotFeeds.delete(feedId);
+            this.bumpMutationRevision(feedId);
+            applied = true;
+        }
+
+        return applied;
     }
 
     clearReadDelta(feedId: number): void {
@@ -78,6 +117,7 @@ export class FeedUnreadCountState {
         return {
             id: this.requestId,
             confirmedReads: Object.fromEntries(this.confirmedReads),
+            pendingReads: Object.fromEntries(this.pendingReads),
             mutationRevisions: Object.fromEntries(this.mutationRevisions),
         };
     }
@@ -91,8 +131,10 @@ export class FeedUnreadCountState {
             const feedId = Number(feedIdText);
             const currentMutationRevision = this.mutationRevisions.get(feedId) ?? 0;
             const requestedMutationRevision = token.mutationRevisions[feedId] ?? 0;
+            const pendingAtRequest = token.pendingReads[feedId] ?? 0;
+            const pendingNow = this.pendingReads.get(feedId) ?? 0;
 
-            if (currentMutationRevision > requestedMutationRevision) {
+            if (currentMutationRevision > requestedMutationRevision || pendingAtRequest > 0 || pendingNow > 0) {
                 const priorCount = this.snapshot?.get(feedId);
                 if (priorCount !== undefined) nextSnapshot.set(feedId, priorCount);
                 else deferredFeeds.add(feedId);
@@ -138,7 +180,9 @@ export class FeedUnreadCountState {
     unreadCount(feedId: number, fallback: number): number {
         if (this.zeroedFeeds.has(feedId)) return 0;
 
-        const serverCount = this.snapshot === null || this.deferredSnapshotFeeds.has(feedId) ? fallback : (this.snapshot.get(feedId) ?? 0);
+        const hasSnapshotCount = this.snapshot?.has(feedId) ?? false;
+        const serverCount =
+            this.snapshot === null || !hasSnapshotCount || this.deferredSnapshotFeeds.has(feedId) ? fallback : this.snapshot.get(feedId)!;
 
         return Math.max(0, serverCount - (this.readDeltas.get(feedId) ?? 0));
     }

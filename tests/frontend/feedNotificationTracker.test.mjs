@@ -48,8 +48,10 @@ test('keeps the notice in the sticky toolbar and articles on document scrolling'
     assert.match(page, /window\.scrollBy\(0, element\.getBoundingClientRect\(\)\.top - anchor\.top\)/);
     assert.match(readStatus, /_readIds\.value\.delete\(id\)[\s\S]*_unreadCounts\.rollbackRead\(feedId\)/);
     assert.match(readStatus, /return runOptimisticMutation\([\s\S]*_markAllSignal\.value =/);
+    assert.match(readStatus, /applyAuthoritativeSnapshot\([\s\S]*response\.data\.affected_feed_ids[\s\S]*requestId/);
     assert.match(sidebar, /if \(\!\(await markAllAsRead\(\{ categoryId \}\)\)\) return/);
-    assert.match(sidebar, /if \(\!\(await markAllAsRead\(\{ feedId \}\)\)\) return/);
+    assert.match(sidebar, /await markAllAsRead\(\{ feedId \}\)/);
+    assert.doesNotMatch(sidebar, /zeroFeedsUnread|zeroFeedUnread/);
     assert.match(page, /if \(\!marked\) return;/);
     assert.match(appHeader, /class="flex h-16/);
     assert.doesNotMatch(appHeader, /\bsticky\b/);
@@ -185,6 +187,168 @@ test('keeps a mark-all result optimistic across older polls, then accepts a late
     assert.equal(counts.acceptSnapshot({ 7: 2 }, pollAfterMarkAll), true);
     assert.equal(counts.unreadCount(7, 99), 2);
     assert.deepEqual(counts.getZeroedFeeds(), new Set());
+});
+
+test('applies authoritative mark-all counts and prevents an older poll from replacing them', () => {
+    const counts = new FeedUnreadCountState();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 8, 8: 3 }, initial);
+    const pollStartedBeforeMarkAll = counts.beginSnapshotRequest();
+
+    counts.applyAuthoritativeSnapshot({ 7: 0, 8: 4 }, [7], 1);
+    assert.equal(counts.unreadCount(7, 99), 0);
+    assert.equal(counts.unreadCount(8, 99), 3);
+    assert.deepEqual(counts.getZeroedFeeds(), new Set());
+
+    assert.equal(counts.acceptSnapshot({ 7: 8, 8: 3 }, pollStartedBeforeMarkAll), true);
+    assert.equal(counts.unreadCount(7, 99), 0);
+    assert.equal(counts.unreadCount(8, 99), 3);
+
+    const pollAfterMarkAll = counts.beginSnapshotRequest();
+    assert.equal(counts.acceptSnapshot({ 7: 1, 8: 4 }, pollAfterMarkAll), true);
+    assert.equal(counts.unreadCount(7, 99), 1);
+    assert.equal(counts.unreadCount(8, 99), 4);
+});
+
+test('reconciles repeated mark-all responses, new arrivals and category totals', () => {
+    const counts = new FeedUnreadCountState();
+    counts.applyAuthoritativeSnapshot({ 7: 0, 8: 0, 9: 2 }, [7, 8, 9], 1);
+    counts.applyAuthoritativeSnapshot({ 7: 1, 8: 0, 9: 2 }, [7, 8, 9], 2);
+
+    const feeds = [
+        { id: 7, category_id: 2 },
+        { id: 8, category_id: 2 },
+        { id: 9, category_id: 3 },
+    ];
+    const categoryCounts = sumCategoryUnreadCounts(feeds, (feed) => counts.unreadCount(feed.id, 99));
+
+    assert.equal(counts.unreadCount(7, 99), 1);
+    assert.deepEqual(
+        categoryCounts,
+        new Map([
+            [2, 1],
+            [3, 2],
+        ]),
+    );
+});
+
+test('mark-all only reconciles affected feeds and keeps unrelated optimistic reads', () => {
+    const counts = new FeedUnreadCountState();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 5, 8: 3 }, initial);
+
+    counts.addRead(7);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    counts.applyAuthoritativeSnapshot({ 7: 5, 8: 0 }, [8], 1);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    assert.equal(counts.unreadCount(8, 99), 0);
+
+    counts.confirmRead(7);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    const confirmedPoll = counts.beginSnapshotRequest();
+    assert.equal(counts.acceptSnapshot({ 7: 4, 8: 0 }, confirmedPoll), true);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    assert.deepEqual(counts.getReadDeltas(), new Map());
+});
+
+test('scoped mark-all keeps fallback counts for feeds before the first poll', () => {
+    const counts = new FeedUnreadCountState();
+
+    assert.equal(counts.unreadCount(7, 5), 5);
+    assert.equal(counts.applyAuthoritativeSnapshot({ 8: 0 }, [8], 1), true);
+
+    assert.equal(counts.unreadCount(7, 5), 5);
+    assert.equal(counts.unreadCount(8, 3), 0);
+    assert.equal(counts.unreadCount(9, 12), 12);
+});
+
+test('scoped snapshots preserve other feed counts after and before complete polls', () => {
+    const counts = new FeedUnreadCountState();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 5, 8: 3 }, initial);
+
+    counts.applyAuthoritativeSnapshot({ 8: 0 }, [8], 1);
+    assert.equal(counts.unreadCount(7, 99), 5);
+    assert.equal(counts.unreadCount(8, 99), 0);
+    assert.equal(counts.unreadCount(9, 12), 12);
+
+    const pollStartedBeforeScopedUpdate = counts.beginSnapshotRequest();
+    counts.applyAuthoritativeSnapshot({ 8: 0 }, [8], 2);
+    assert.equal(counts.acceptSnapshot({ 7: 4, 8: 3 }, pollStartedBeforeScopedUpdate), true);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    assert.equal(counts.unreadCount(8, 99), 0);
+    assert.equal(counts.unreadCount(9, 12), 12);
+});
+
+test('partial scoped snapshots retain unrelated optimistic counts through rollback', () => {
+    const counts = new FeedUnreadCountState();
+    counts.addRead(7);
+    assert.equal(counts.unreadCount(7, 5), 4);
+
+    counts.applyAuthoritativeSnapshot({ 8: 0 }, [8], 1);
+    assert.equal(counts.unreadCount(7, 5), 4);
+    assert.equal(counts.unreadCount(8, 3), 0);
+
+    counts.rollbackRead(7);
+    assert.equal(counts.unreadCount(7, 5), 5);
+});
+
+test('defers snapshots overlapping an unconfirmed read, including response-before-confirmation', () => {
+    const counts = new FeedUnreadCountState();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 5 }, initial);
+
+    counts.addRead(7);
+    const requestDuringPendingRead = counts.beginSnapshotRequest();
+    assert.equal(counts.acceptSnapshot({ 7: 4 }, requestDuringPendingRead), true);
+    assert.equal(counts.unreadCount(7, 99), 4);
+
+    counts.confirmRead(7);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    const requestAfterConfirmation = counts.beginSnapshotRequest();
+    assert.equal(counts.acceptSnapshot({ 7: 4 }, requestAfterConfirmation), true);
+    assert.equal(counts.unreadCount(7, 99), 4);
+    assert.deepEqual(counts.getReadDeltas(), new Map());
+});
+
+test('applies reversed independent mark-all responses but rejects stale same-feed responses', () => {
+    const counts = new FeedUnreadCountState();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 5, 8: 4 }, initial);
+
+    // Request B (feed 8, revision 2) completes before request A (feed 7, revision 1).
+    counts.applyAuthoritativeSnapshot({ 7: 5, 8: 0 }, [8], 2);
+    counts.applyAuthoritativeSnapshot({ 7: 0, 8: 0 }, [7], 1);
+    assert.equal(counts.unreadCount(7, 99), 0);
+    assert.equal(counts.unreadCount(8, 99), 0);
+
+    counts.applyAuthoritativeSnapshot({ 7: 1, 8: 0 }, [7], 3);
+    counts.applyAuthoritativeSnapshot({ 7: 0, 8: 0 }, [7], 2);
+    assert.equal(counts.unreadCount(7, 99), 1);
+});
+
+test('a failed mark-all leaves prior counts intact and later authoritative recovery applies', async () => {
+    const counts = new FeedUnreadCountState();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 5 }, initial);
+
+    const failed = await runOptimisticMutation(
+        async () => {
+            throw new Error('mark-all failed');
+        },
+        () => counts.applyAuthoritativeSnapshot({ 7: 0 }, [7], 1),
+        () => {},
+    );
+    assert.equal(failed, false);
+    assert.equal(counts.unreadCount(7, 99), 5);
+
+    const recovered = await runOptimisticMutation(
+        async () => ({ unread_counts: { 7: 1 } }),
+        (response) => counts.applyAuthoritativeSnapshot(response.unread_counts, [7], 2),
+        () => {},
+    );
+    assert.equal(recovered, true);
+    assert.equal(counts.unreadCount(7, 99), 1);
 });
 
 test('sums unread counts by the category membership supplied for active sidebar feeds', () => {

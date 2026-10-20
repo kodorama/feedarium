@@ -9,9 +9,10 @@ use SimplePie\SimplePie;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
+use App\Domains\News\Jobs\EnrichArticleJob;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use App\Domains\News\Jobs\ScrapeArticleThumbnailJob;
+use App\Domains\News\Jobs\WithoutOverlappingPublisherWork;
 
 /**
  * Parses and imports feed items from raw XML content into the news table.
@@ -20,7 +21,8 @@ use App\Domains\News\Jobs\ScrapeArticleThumbnailJob;
  *  - Parsing RSS/Atom XML via SimplePie
  *  - Deduplicating items by guid or link
  *  - Inserting new News records
- *  - Dispatching ScrapeArticleThumbnailJob per new item
+ *  - Importing feed-provided preview images before HTML enrichment
+ *  - Dispatching one combined article enrichment job when work is needed
  *
  * Queued so that importing is non-blocking and retryable.
  */
@@ -28,9 +30,30 @@ final class ImportFeedItemsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    public int $maxExceptions = 5;
 
     public int $backoff = 30;
+
+    /** @return array<int, class-string> */
+    public function middleware(): array
+    {
+        return [WithoutOverlappingPublisherWork::class];
+    }
+
+    public function publisherWorkKey(): string
+    {
+        return 'import:feed:'.$this->feedId;
+    }
+
+    public function publisherWorkLockExpiresAfter(): int
+    {
+        return 180;
+    }
+
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addHours((int) config('feedarium.publisher_throttle.retry_window_hours', 6));
+    }
 
     public function __construct(
         public readonly int $feedId,
@@ -87,6 +110,18 @@ final class ImportFeedItemsJob implements ShouldQueue
                 $publishedAt = \Illuminate\Support\Carbon::createFromTimestamp((int) $dateRaw);
             }
 
+            $thumbnailUrl = $this->validImageUrl($item->get_thumbnail()['url'] ?? null);
+            if (! $thumbnailUrl) {
+                foreach ($item->get_enclosures() ?? [] as $enclosure) {
+                    if (str_starts_with(strtolower((string) $enclosure->get_type()), 'image/')) {
+                        $thumbnailUrl = $this->validImageUrl($enclosure->get_link());
+                        if ($thumbnailUrl) {
+                            break;
+                        }
+                    }
+                }
+            }
+
             $news = News::query()->create([
                 'feed_id' => $feed->id,
                 'title' => $item->get_title() ?? '(no title)',
@@ -96,15 +131,24 @@ final class ImportFeedItemsJob implements ShouldQueue
                 'author' => $item->get_author()?->get_name(),
                 'guid' => $guid,
                 'is_read' => false,
+                'thumbnail_url' => $thumbnailUrl,
             ]);
 
-            if ($link) {
-                ScrapeArticleThumbnailJob::dispatch($news->id);
-            }
-
-            if ($scrapeFullBody && $link && ! $feed->disable_full_article_scraping) {
-                \App\Domains\News\Jobs\ScrapeArticleBodyJob::dispatch($news->id, $link);
+            $needsBody = $scrapeFullBody && ! $feed->disable_full_article_scraping;
+            if ($link && ($needsBody || ! $thumbnailUrl)) {
+                EnrichArticleJob::dispatch($news->id);
             }
         }
+    }
+
+    private function validImageUrl(?string $url): ?string
+    {
+        if (! $url || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        return in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)
+            ? $url
+            : null;
     }
 }

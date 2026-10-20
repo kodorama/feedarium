@@ -5,7 +5,7 @@ use App\Models\News;
 use App\Models\User;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
-use App\Domains\News\Jobs\ScrapeArticleBodyJob;
+use App\Domains\News\Jobs\EnrichArticleJob;
 
 describe('ScrapeArticleBodyJob', function () {
     beforeEach(function () {
@@ -26,7 +26,7 @@ describe('ScrapeArticleBodyJob', function () {
             ),
         ]);
 
-        (new ScrapeArticleBodyJob($news->id))->handle();
+        $this->app->call([new EnrichArticleJob($news->id), 'handle']);
 
         expect($news->fresh()->full_body)->toContain('This is the article content.');
     });
@@ -39,9 +39,9 @@ describe('ScrapeArticleBodyJob', function () {
 
         Http::fake();
 
-        (new ScrapeArticleBodyJob($news->id))->handle();
+        $this->app->call([new EnrichArticleJob($news->id), 'handle']);
 
-        Http::assertNothingSent();
+        Http::assertSentCount(1); // Thumbnail enrichment remains active when body scraping is disabled.
         expect($news->fresh()->full_body)->toBeNull();
     });
 });

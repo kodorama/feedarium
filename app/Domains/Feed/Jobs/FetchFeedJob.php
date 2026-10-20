@@ -13,7 +13,9 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use App\Domains\News\Jobs\PublisherRequestGate;
 use Illuminate\Http\Client\ConnectionException;
+use App\Domains\News\Jobs\RateLimitPublisherRequests;
 
 /**
  * Fetches the raw RSS/Atom feed XML for a given Feed record.
@@ -36,19 +38,49 @@ final class FetchFeedJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    public int $maxExceptions = 5;
+
+    public ?int $retryDelaySeconds = null;
 
     /**
      * @return array<int, int>
      */
     public function backoff(): array
     {
+        if ($this->retryDelaySeconds !== null) {
+            return [$this->retryDelaySeconds, $this->retryDelaySeconds, $this->retryDelaySeconds];
+        }
+
         return [60, 300, 900];
+    }
+
+    /** @return array<int, class-string> */
+    public function middleware(): array
+    {
+        return [
+            \App\Domains\News\Jobs\WithoutOverlappingPublisherWork::class,
+            RateLimitPublisherRequests::class,
+        ];
+    }
+
+    public function publisherWorkKey(): string
+    {
+        return 'feed:'.$this->feedId;
+    }
+
+    public function publisherUrl(): ?string
+    {
+        return Feed::query()->whereKey($this->feedId)->value('url');
+    }
+
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addHours((int) config('feedarium.publisher_throttle.retry_window_hours', 6));
     }
 
     public function __construct(public readonly int $feedId) {}
 
-    public function handle(): void
+    public function handle(PublisherRequestGate $gate): void
     {
         $feed = Feed::query()->findOrFail($this->feedId);
 
@@ -78,13 +110,15 @@ final class FetchFeedJob implements ShouldQueue
         } catch (ConnectionException $exception) {
             Log::warning('FetchFeedJob: connection error', [
                 'feed_id' => $this->feedId,
-                'url' => $feed->url,
+                'host' => parse_url($feed->url, PHP_URL_HOST),
                 'attempt' => $this->attempts(),
-                'error' => $exception->getMessage(),
+                'error_class' => $exception::class,
             ]);
 
             throw $exception;
         }
+
+        $gate->recordRedirect($feed->url, (string) $response->effectiveUri());
 
         // 304 Not Modified — skip import, just update last_fetched_at
         if ($response->status() === 304) {
@@ -96,7 +130,7 @@ final class FetchFeedJob implements ShouldQueue
         }
 
         if (! $response->successful()) {
-            $this->handleUnsuccessfulResponse($feed, $response);
+            $this->handleUnsuccessfulResponse($feed, $response, $gate);
 
             return;
         }
@@ -113,15 +147,32 @@ final class FetchFeedJob implements ShouldQueue
     private function handleUnsuccessfulResponse(
         Feed $feed,
         Response $response,
+        PublisherRequestGate $gate,
     ): void {
         Log::warning('FetchFeedJob: unsuccessful response', [
             'feed_id' => $this->feedId,
-            'url' => $feed->url,
+            'host' => parse_url($feed->url, PHP_URL_HOST),
             'status' => $response->status(),
             'attempt' => $this->attempts(),
         ]);
 
         if ($this->isRetryableStatus($response->status())) {
+            if (in_array($response->status(), [429, 503], true)) {
+                $seconds = $gate->cooldownFor($response->header('Retry-After'), $this->attempts());
+                $this->retryDelaySeconds = $seconds;
+                $originalSaved = $gate->cooldown($feed->url, $seconds);
+                $effectiveSaved = $gate->cooldown((string) $response->effectiveUri(), $seconds);
+                if (! $originalSaved || ! $effectiveSaved) {
+                    throw new RuntimeException('Unable to persist the publisher cooldown.');
+                }
+            }
+
+            if ($this->job !== null && in_array($response->status(), [429, 503], true)) {
+                $this->release($this->retryDelaySeconds ?? 30);
+
+                return;
+            }
+
             throw new RuntimeException(
                 "Temporary HTTP {$response->status()} while fetching feed {$this->feedId}."
             );
@@ -144,7 +195,7 @@ final class FetchFeedJob implements ShouldQueue
     {
         Log::error('FetchFeedJob: exhausted all attempts', [
             'feed_id' => $this->feedId,
-            'error' => $exception?->getMessage(),
+            'error_class' => $exception ? $exception::class : null,
         ]);
     }
 }

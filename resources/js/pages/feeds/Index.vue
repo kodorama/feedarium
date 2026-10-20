@@ -1,17 +1,19 @@
 <script setup lang="ts">
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { TitleTooltip } from '@/components/ui/tooltip';
+import { mergeArticlePages, mergeSnapshotPage } from '@/composables/feedArticlePages';
+import { loadAtSnapshot } from '@/composables/feedNotificationTracker';
 import { stripHtml, useArticleContent } from '@/composables/useArticleContent';
-import { useFeedNotifications } from '@/composables/useFeedNotifications';
+import { type FeedUpdateFilters, useFeedNotifications } from '@/composables/useFeedNotifications';
 import { useFullBody } from '@/composables/useFullBody';
 import { useNewsSearch } from '@/composables/useNewsSearch';
 import { useReadStatus } from '@/composables/useReadStatus';
 import { useSavedArticles } from '@/composables/useSavedArticles';
 import { useViewPreferences } from '@/composables/useViewPreferences';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TitleTooltip } from '@/components/ui/tooltip';
+import axios from '@/lib/axios';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/vue3';
-import axios from '@/lib/axios';
 import {
     AlignJustify,
     BookOpen,
@@ -34,13 +36,13 @@ import {
     Settings2,
     X,
 } from 'lucide-vue-next';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const page = usePage();
 const { save, unsave, isSaving } = useSavedArticles();
-const { feedUpdated, resetNotification } = useFeedNotifications();
+const { newArticleCount, checkForUpdates, captureSnapshot, acknowledgeDisplayed, beginContext, initializeContext } = useFeedNotifications();
 const { readIds, markAllSignal, markAsRead, markAllAsRead, addReads, populateFromArticles } = useReadStatus();
 const {
     searchQuery,
@@ -102,8 +104,13 @@ const showUnreadOnly = ref(false);
 
 const articles = ref<Article[]>([]);
 const loading = ref(true);
+const refreshing = ref(false);
 const loadingMore = ref(false);
 const nextCursor = ref<string | null>(null);
+const listSnapshotId = ref<number | null>(null);
+let contextGeneration = 0;
+const contextLoading = ref(false);
+const loadedFilterSignature = ref('');
 const hasMore = computed(() => nextCursor.value !== null);
 
 const savedIds = ref<Set<number>>(new Set());
@@ -205,39 +212,107 @@ const groupedArticles = computed(() => {
 // ---------------------------------------------------------------------------
 // Data fetching
 // ---------------------------------------------------------------------------
-async function loadArticles(reset = true): Promise<void> {
-    if (!reset && (loadingMore.value || loading.value || !hasMore.value)) return;
+async function loadArticles(
+    reset = true,
+    options: { filters: FeedUpdateFilters; generation: number; snapshotId?: number; preserveContent?: boolean } = {
+        filters: updateFilters(),
+        generation: contextGeneration,
+        snapshotId: listSnapshotId.value ?? undefined,
+    },
+): Promise<boolean> {
+    if (
+        !reset &&
+        (contextLoading.value ||
+            loadingMore.value ||
+            loading.value ||
+            !hasMore.value ||
+            loadedFilterSignature.value !== JSON.stringify(options.filters))
+    )
+        return false;
 
     if (reset) {
-        articles.value = [];
-        nextCursor.value = null;
-        loading.value = true;
+        if (options.preserveContent && articles.value.length > 0) refreshing.value = true;
+        else loading.value = true;
     } else {
         loadingMore.value = true;
     }
 
     try {
-        const params: Record<string, unknown> = { per_page: 20 };
+        const params: Record<string, unknown> = { per_page: 20, ...options.filters };
+        if (options.snapshotId !== undefined) params.snapshot_id = options.snapshotId;
         if (!reset && nextCursor.value) params.cursor = nextCursor.value;
-        if (selectedFeedId.value !== null) params.feed_id = selectedFeedId.value;
-        if (selectedCategoryId.value !== null) params.category_id = selectedCategoryId.value;
-        if (showUnreadOnly.value) params.unread_only = 1;
 
         const res = await axios.get('/api/news', { params });
+        if (options.generation !== contextGeneration) return false;
         const newArticles: Article[] = res.data.data;
 
-        if (reset) {
+        if (reset && options.preserveContent) {
+            const page = mergeSnapshotPage(articles.value, newArticles, res.data.meta?.next_cursor ?? null);
+            articles.value = page.items;
+            nextCursor.value = page.nextCursor;
+        } else if (reset) {
             articles.value = newArticles;
+            nextCursor.value = res.data.meta?.next_cursor ?? null;
         } else {
-            articles.value.push(...newArticles);
+            articles.value = mergeArticlePages(articles.value, newArticles);
+            nextCursor.value = res.data.meta?.next_cursor ?? null;
         }
 
-        nextCursor.value = res.data.meta?.next_cursor ?? null;
+        if (reset && options.snapshotId !== undefined) listSnapshotId.value = options.snapshotId;
         populateFromArticles(newArticles);
+        if (!reset && options.snapshotId !== undefined) {
+            await nextTick();
+            await acknowledgeDisplayed(
+                options.snapshotId,
+                options.filters,
+                articles.value.map((article) => article.id),
+                options.generation,
+            );
+        }
+        return true;
+    } catch {
+        return false;
     } finally {
-        loading.value = false;
-        loadingMore.value = false;
+        if (options.generation === contextGeneration) {
+            loading.value = false;
+            loadingMore.value = false;
+            if (!options.preserveContent) refreshing.value = false;
+        }
     }
+}
+
+function updateFilters(): FeedUpdateFilters {
+    return {
+        ...(selectedFeedId.value !== null ? { feed_id: selectedFeedId.value } : {}),
+        ...(selectedCategoryId.value !== null ? { category_id: selectedCategoryId.value } : {}),
+        ...(showUnreadOnly.value ? { unread_only: 1 } : {}),
+    };
+}
+
+async function loadCurrentContext(): Promise<void> {
+    const filters = updateFilters();
+    const generation = (contextGeneration = beginContext());
+    contextLoading.value = true;
+    const snapshotId = await loadAtSnapshot(
+        () => captureSnapshot(filters),
+        (id) => loadArticles(true, { filters, generation, snapshotId: id }),
+        () => generation === contextGeneration,
+    );
+    if (generation !== contextGeneration) return;
+    if (snapshotId === null) {
+        loading.value = false;
+        refreshing.value = false;
+        contextLoading.value = false;
+
+        return;
+    }
+
+    if (generation === contextGeneration) {
+        await nextTick();
+        initializeContext(filters, snapshotId, generation);
+        loadedFilterSignature.value = JSON.stringify(filters);
+    }
+    if (generation === contextGeneration) contextLoading.value = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +323,7 @@ watch(
     (val) => {
         selectedFeedId.value = val ?? null;
         selectedCategoryId.value = null;
-        loadArticles(true);
+        void loadCurrentContext();
     },
 );
 
@@ -257,11 +332,11 @@ watch(
     (val) => {
         selectedCategoryId.value = val ?? null;
         selectedFeedId.value = null;
-        loadArticles(true);
+        void loadCurrentContext();
     },
 );
 
-watch(showUnreadOnly, () => loadArticles(true));
+watch(showUnreadOnly, () => void loadCurrentContext());
 
 // Trigger debounced search whenever the query, active feed, or active category changes
 watch([searchQuery, selectedCategoryId, selectedFeedId], ([q, catId, feedId]) => {
@@ -293,10 +368,11 @@ async function toggleSave(article: Article): Promise<void> {
 }
 
 async function markAllVisible(): Promise<void> {
-    await markAllAsRead({
+    const marked = await markAllAsRead({
         feedId: selectedFeedId.value ?? undefined,
         categoryId: selectedCategoryId.value ?? undefined,
     });
+    if (!marked) return;
     addReads(articles.value.map((a) => a.id));
     if (showUnreadOnly.value) {
         await loadArticles(true);
@@ -304,8 +380,49 @@ async function markAllVisible(): Promise<void> {
 }
 
 async function refresh(): Promise<void> {
-    resetNotification();
-    await loadArticles(true);
+    const filters = updateFilters();
+    const generation = (contextGeneration = beginContext());
+    contextLoading.value = true;
+    refreshing.value = true;
+    const anchor = captureScrollAnchor();
+    const snapshotId = await loadAtSnapshot(
+        () => captureSnapshot(filters),
+        (id) => loadArticles(true, { filters, generation, snapshotId: id, preserveContent: true }),
+        () => generation === contextGeneration,
+    );
+    if (generation !== contextGeneration) return;
+    if (snapshotId === null) {
+        loading.value = false;
+        refreshing.value = false;
+        contextLoading.value = false;
+
+        return;
+    }
+
+    if (generation === contextGeneration) {
+        await nextTick();
+        restoreScrollAnchor(anchor);
+        await acknowledgeDisplayed(
+            snapshotId,
+            filters,
+            articles.value.map((article) => article.id),
+            generation,
+        );
+        refreshing.value = false;
+    }
+    if (generation === contextGeneration) contextLoading.value = false;
+}
+
+function captureScrollAnchor(): { id: string; top: number } | null {
+    const visible = Array.from(document.querySelectorAll<HTMLElement>('[data-article-id]')).find((item) => item.getBoundingClientRect().bottom > 0);
+
+    return visible?.dataset.articleId ? { id: visible.dataset.articleId, top: visible.getBoundingClientRect().top } : null;
+}
+
+function restoreScrollAnchor(anchor: { id: string; top: number } | null): void {
+    if (!anchor) return;
+    const element = document.querySelector<HTMLElement>(`[data-article-id="${anchor.id}"]`);
+    if (element) window.scrollBy(0, element.getBoundingClientRect().top - anchor.top);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,12 +475,22 @@ function onKeyDown(e: KeyboardEvent): void {
     else if (e.key === 'f' || e.key === 'F') toggleFullBody();
 }
 
+let updatePoll: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
-    loadArticles(true);
+    void loadCurrentContext();
+    updatePoll = setInterval(() => {
+        if (!isSearchMode.value && !contextLoading.value) {
+            const filters = updateFilters();
+            if (loadedFilterSignature.value !== JSON.stringify(filters)) void loadCurrentContext();
+            else void checkForUpdates(filters);
+        }
+    }, 30_000);
     window.addEventListener('keydown', onKeyDown);
 });
 
 onUnmounted(() => {
+    if (updatePoll !== null) clearInterval(updatePoll);
     loadMoreObserver?.disconnect();
     window.removeEventListener('keydown', onKeyDown);
 });
@@ -401,165 +528,334 @@ watch(loadMoreBtn, (btn) => {
 <template>
     <Head :title="pageTitle" />
     <AppLayout :breadcrumbs="breadcrumbs">
-        <!-- ── Sticky header ──────────────────────────────────────────────── -->
-        <div
-            class="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm md:flex-nowrap md:px-6"
-        >
-            <!-- Title: always the first item -->
-            <h1 class="order-1 shrink-0 truncate text-xl font-bold">{{ pageTitle }}</h1>
+        <!-- ── Sticky feed toolbar and notice ─────────────────────────────── -->
+        <div class="sticky top-0 z-10">
+            <div
+                data-slot="feed-toolbar-row"
+                class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm md:flex-nowrap md:px-6"
+            >
+                <!-- Title: always the first item -->
+                <h1 class="order-1 shrink-0 truncate text-xl font-bold">{{ pageTitle }}</h1>
 
-            <!-- Actions: sit right of title on mobile (order-2 + ml-auto), end of row on md+ (order-3) -->
-            <div class="order-2 ml-auto flex shrink-0 items-center gap-1.5 md:order-3 md:ml-0">
-                <!-- Show unread only / Show all toggle -->
-                <TitleTooltip :title="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')">
-                    <button
-                        @click="showUnreadOnly = !showUnreadOnly"
-                        :class="[
-                            'cursor-pointer rounded-lg p-1.5 transition-colors',
-                            showUnreadOnly
-                                ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                        ]"
-                        :aria-label="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')"
-                    >
-                        <MailOpen v-if="showUnreadOnly" class="h-4 w-4" />
-                        <Mail v-else class="h-4 w-4" />
-                    </button>
-                </TitleTooltip>
-
-                <!-- Mark all as read -->
-                <TitleTooltip :title="t('general.mark_all_read')">
-                    <button
-                        @click="markAllVisible"
-                        class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        :aria-label="t('general.mark_all_read')"
-                    >
-                        <CheckCheck class="h-4 w-4" />
-                    </button>
-                </TitleTooltip>
-
-                <!-- Feed customize — only shown when a specific feed is active -->
-                <TitleTooltip v-if="selectedFeedId" :title="t('feeds.customize')">
-                    <button
-                        @click="openFeedCustomize"
-                        class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        :aria-label="t('feeds.customize')"
-                    >
-                        <Settings2 class="h-4 w-4" />
-                    </button>
-                </TitleTooltip>
-
-                <!-- View-mode toggle -->
-                <div class="flex items-center gap-0.5 rounded-lg border border-border p-1">
-                    <TitleTooltip :title="t('general.list_view')">
+                <!-- Actions: sit right of title on mobile (order-2 + ml-auto), end of row on md+ (order-3) -->
+                <div class="order-2 ml-auto flex shrink-0 items-center gap-1.5 md:order-3 md:ml-0">
+                    <!-- Show unread only / Show all toggle -->
+                    <TitleTooltip :title="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')">
                         <button
-                            @click="viewMode = 'list'"
+                            @click="showUnreadOnly = !showUnreadOnly"
                             :class="[
-                                'cursor-pointer rounded p-1.5 transition-colors',
-                                viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                                'cursor-pointer rounded-lg p-1.5 transition-colors',
+                                showUnreadOnly
+                                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                             ]"
-                            :aria-label="t('general.list_view')"
+                            :aria-label="showUnreadOnly ? t('general.show_all') : t('general.show_unread_only')"
                         >
-                            <LayoutList class="h-4 w-4" />
-                        </button>
-                    </TitleTooltip>
-                    <TitleTooltip :title="t('general.compact_view')">
-                        <button
-                            @click="viewMode = 'compact'"
-                            :class="[
-                                'cursor-pointer rounded p-1.5 transition-colors',
-                                viewMode === 'compact' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                            ]"
-                            :aria-label="t('general.compact_view')"
-                        >
-                            <AlignJustify class="h-4 w-4" />
-                        </button>
-                    </TitleTooltip>
-                    <TitleTooltip :title="t('general.grid_view')">
-                        <button
-                            @click="viewMode = 'grid'"
-                            :class="[
-                                'cursor-pointer rounded p-1.5 transition-colors',
-                                viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                            ]"
-                            :aria-label="t('general.grid_view')"
-                        >
-                            <LayoutGrid class="h-4 w-4" />
+                            <MailOpen v-if="showUnreadOnly" class="h-4 w-4" />
+                            <Mail v-else class="h-4 w-4" />
                         </button>
                     </TitleTooltip>
 
-                    <!-- Column count — only visible in grid mode, numbers hidden on mobile portrait -->
-                    <template v-if="viewMode === 'grid'">
-                        <div class="mx-1 h-4 w-px shrink-0 bg-border max-sm:hidden sm:block" />
-                        <TitleTooltip v-for="col in [2, 3, 4]" :key="col" :title="`${col} ${t('general.columns')}`">
+                    <!-- Mark all as read -->
+                    <TitleTooltip :title="t('general.mark_all_read')">
+                        <button
+                            @click="markAllVisible"
+                            class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            :aria-label="t('general.mark_all_read')"
+                        >
+                            <CheckCheck class="h-4 w-4" />
+                        </button>
+                    </TitleTooltip>
+
+                    <!-- Feed customize — only shown when a specific feed is active -->
+                    <TitleTooltip v-if="selectedFeedId" :title="t('feeds.customize')">
+                        <button
+                            @click="openFeedCustomize"
+                            class="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            :aria-label="t('feeds.customize')"
+                        >
+                            <Settings2 class="h-4 w-4" />
+                        </button>
+                    </TitleTooltip>
+
+                    <!-- View-mode toggle -->
+                    <div class="flex items-center gap-0.5 rounded-lg border border-border p-1">
+                        <TitleTooltip :title="t('general.list_view')">
                             <button
-                                @click="gridColumns = col"
+                                @click="viewMode = 'list'"
                                 :class="[
-                                    'min-w-6 cursor-pointer rounded p-1.5 text-xs font-semibold transition-colors max-sm:hidden sm:inline-flex',
-                                    gridColumns === col ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                                    'cursor-pointer rounded p-1.5 transition-colors',
+                                    viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
                                 ]"
+                                :aria-label="t('general.list_view')"
                             >
-                                {{ col }}
+                                <LayoutList class="h-4 w-4" />
                             </button>
                         </TitleTooltip>
-                    </template>
+                        <TitleTooltip :title="t('general.compact_view')">
+                            <button
+                                @click="viewMode = 'compact'"
+                                :class="[
+                                    'cursor-pointer rounded p-1.5 transition-colors',
+                                    viewMode === 'compact' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                                ]"
+                                :aria-label="t('general.compact_view')"
+                            >
+                                <AlignJustify class="h-4 w-4" />
+                            </button>
+                        </TitleTooltip>
+                        <TitleTooltip :title="t('general.grid_view')">
+                            <button
+                                @click="viewMode = 'grid'"
+                                :class="[
+                                    'cursor-pointer rounded p-1.5 transition-colors',
+                                    viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                                ]"
+                                :aria-label="t('general.grid_view')"
+                            >
+                                <LayoutGrid class="h-4 w-4" />
+                            </button>
+                        </TitleTooltip>
+
+                        <!-- Column count — only visible in grid mode, numbers hidden on mobile portrait -->
+                        <template v-if="viewMode === 'grid'">
+                            <div class="mx-1 h-4 w-px shrink-0 bg-border max-sm:hidden sm:block" />
+                            <TitleTooltip v-for="col in [2, 3, 4]" :key="col" :title="`${col} ${t('general.columns')}`">
+                                <button
+                                    @click="gridColumns = col"
+                                    :class="[
+                                        'min-w-6 cursor-pointer rounded p-1.5 text-xs font-semibold transition-colors max-sm:hidden sm:inline-flex',
+                                        gridColumns === col ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                                    ]"
+                                >
+                                    {{ col }}
+                                </button>
+                            </TitleTooltip>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Search: full-width below title on mobile/tablet portrait, inline on md+ -->
+                <div class="relative order-3 flex w-full min-w-0 items-center md:order-2 md:max-w-xs md:flex-1">
+                    <Search class="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                        v-model="searchQuery"
+                        type="text"
+                        :placeholder="t('news.search_placeholder')"
+                        class="h-8 w-full rounded-lg border border-border bg-muted/40 pr-8 pl-8 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <TitleTooltip v-if="searchQuery" :title="t('general.clear_search')">
+                        <button @click="clearSearch" class="absolute right-2 cursor-pointer text-muted-foreground hover:text-foreground">
+                            <X class="h-3.5 w-3.5" />
+                        </button>
+                    </TitleTooltip>
                 </div>
             </div>
 
-            <!-- Search: full-width below title on mobile/tablet portrait, inline on md+ -->
-            <div class="relative order-3 flex w-full min-w-0 items-center md:order-2 md:max-w-xs md:flex-1">
-                <Search class="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
-                <input
-                    v-model="searchQuery"
-                    type="text"
-                    :placeholder="t('news.search_placeholder')"
-                    class="h-8 w-full rounded-lg border border-border bg-muted/40 pr-8 pl-8 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:ring-1 focus:ring-primary focus:outline-none"
-                />
-                <TitleTooltip v-if="searchQuery" :title="t('general.clear_search')">
-                    <button @click="clearSearch" class="absolute right-2 cursor-pointer text-muted-foreground hover:text-foreground">
-                        <X class="h-3.5 w-3.5" />
-                    </button>
-                </TitleTooltip>
+            <div data-slot="feed-notification-row" class="px-4 md:px-6">
+                <Transition
+                    enter-active-class="transition-[opacity,transform] duration-[250ms] ease-out motion-reduce:transition-none"
+                    enter-from-class="-translate-y-2 opacity-0 motion-reduce:translate-y-0"
+                    enter-to-class="translate-y-0 opacity-100"
+                    leave-active-class="transition-[opacity,transform] duration-[250ms] ease-in motion-reduce:transition-none"
+                    leave-from-class="translate-y-0 opacity-100"
+                    leave-to-class="-translate-y-2 opacity-0 motion-reduce:translate-y-0"
+                >
+                    <div
+                        v-if="newArticleCount > 0 && !isSearchMode && loadedFilterSignature === JSON.stringify(updateFilters())"
+                        key="new-articles"
+                        class="pointer-events-auto mx-auto mt-2 flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/15 bg-background/95 px-3 py-2 text-sm text-foreground shadow-lg backdrop-blur-md"
+                    >
+                        <span role="status" aria-live="polite" aria-atomic="true" class="min-w-0 flex-1">
+                            {{ t('news.new_available', { count: newArticleCount }) }}
+                        </span>
+                        <button
+                            type="button"
+                            @click="refresh"
+                            :disabled="loading || refreshing"
+                            class="flex shrink-0 cursor-pointer items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            <RefreshCw class="h-4 w-4" /> {{ t('general.refresh') }}
+                        </button>
+                    </div>
+                </Transition>
             </div>
         </div>
 
-        <!-- ── Scrollable content area ──────────────────────────────────── -->
-        <div class="min-h-0 flex-1 overflow-y-auto">
-            <!-- Feed-updated banner -->
-            <div
-                v-if="feedUpdated"
-                class="mx-4 mt-4 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800 md:mx-6 dark:bg-blue-900/30 dark:text-blue-200"
-            >
-                <span>{{ t('news.new_available') }}</span>
-                <button
-                    @click="refresh"
-                    class="ml-4 flex cursor-pointer items-center gap-1 rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
-                >
-                    <RefreshCw class="h-4 w-4" /> {{ t('general.refresh') }}
-                </button>
-            </div>
+        <!-- Main article content flows with the document. -->
+        <div class="px-4 py-4 md:px-6">
+            <!-- ── Search results ──────────────────────────────────────── -->
+            <template v-if="isSearchMode">
+                <div v-if="isSearching" class="py-12 text-center text-muted-foreground">{{ t('news.searching') }}</div>
 
-            <!-- Main content -->
-            <div class="px-4 py-4 md:px-6">
-                <!-- ── Search results ──────────────────────────────────────── -->
-                <template v-if="isSearchMode">
-                    <div v-if="isSearching" class="py-12 text-center text-muted-foreground">{{ t('news.searching') }}</div>
+                <div v-else-if="hasSearched && searchResults.length === 0" class="py-12 text-center text-muted-foreground">
+                    <Search class="mx-auto mb-3 h-10 w-10 opacity-40" />
+                    <p>{{ t('news.no_search_results') }}</p>
+                </div>
 
-                    <div v-else-if="hasSearched && searchResults.length === 0" class="py-12 text-center text-muted-foreground">
-                        <Search class="mx-auto mb-3 h-10 w-10 opacity-40" />
-                        <p>{{ t('news.no_search_results') }}</p>
+                <ul v-else-if="searchResults.length > 0" :class="viewMode === 'grid' ? gridClass : 'space-y-3'">
+                    <li
+                        v-for="article in searchResults"
+                        :key="article.id"
+                        @click="openReader(article)"
+                        :class="[
+                            'cursor-pointer rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md',
+                            viewMode === 'grid' ? 'flex flex-col overflow-hidden' : 'flex gap-4 p-4',
+                        ]"
+                    >
+                        <template v-if="viewMode !== 'compact'">
+                            <img
+                                v-if="article.thumbnail_url"
+                                :src="article.thumbnail_url"
+                                :alt="article.title"
+                                loading="lazy"
+                                referrerpolicy="no-referrer"
+                                :class="
+                                    viewMode === 'grid'
+                                        ? 'h-44 w-full shrink-0 object-cover'
+                                        : 'h-20 w-32 shrink-0 rounded-lg object-cover sm:h-24 sm:w-36'
+                                "
+                                @error="($event.target as HTMLImageElement).style.display = 'none'"
+                            />
+                            <div
+                                v-else
+                                :class="[
+                                    'flex shrink-0 items-center justify-center bg-linear-to-br from-muted/60 to-muted',
+                                    viewMode === 'grid' ? 'h-44 w-full' : 'h-20 w-32 rounded-lg sm:h-24 sm:w-36',
+                                ]"
+                            >
+                                <img
+                                    v-if="article.feed?.favicon_url"
+                                    :src="article.feed.favicon_url"
+                                    loading="lazy"
+                                    referrerpolicy="no-referrer"
+                                    class="h-8 w-8 rounded-sm object-contain opacity-40"
+                                    alt=""
+                                    @error="($event.target as HTMLImageElement).style.display = 'none'"
+                                />
+                                <Rss v-else class="h-8 w-8 text-muted-foreground/30" />
+                            </div>
+                        </template>
+
+                        <div :class="['flex min-w-0 flex-1 flex-col gap-1', viewMode === 'grid' ? 'p-4' : '']">
+                            <span
+                                :class="[
+                                    'line-clamp-2 leading-snug font-semibold transition-colors',
+                                    readIds.has(article.id) ? 'text-muted-foreground' : '',
+                                ]"
+                            >
+                                {{ article.title }}
+                            </span>
+                            <p v-if="article.description" class="line-clamp-2 text-sm text-muted-foreground">
+                                {{ stripHtml(article.description) }}
+                            </p>
+                            <div class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <span class="flex min-w-0 items-center gap-1.5">
+                                        <img
+                                            v-if="article.feed?.favicon_url"
+                                            :src="article.feed.favicon_url"
+                                            referrerpolicy="no-referrer"
+                                            class="h-3.5 w-3.5 shrink-0 rounded-sm object-contain"
+                                            @error="($event.target as HTMLImageElement).style.display = 'none'"
+                                            alt=""
+                                        />
+                                        <Rss v-else class="h-3 w-3 shrink-0" />
+                                        <span :class="['truncate', viewMode === 'grid' ? 'max-w-32' : 'max-w-28 sm:max-w-none']">{{
+                                            article.feed?.name
+                                        }}</span>
+                                    </span>
+                                    <span v-if="article.published_at" class="shrink-0">{{ formatDate(article.published_at) }}</span>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <TitleTooltip :title="t('general.read_more')">
+                                        <a
+                                            :href="article.link"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="flex cursor-pointer items-center gap-1 hover:text-foreground"
+                                            @click.stop
+                                        >
+                                            <ExternalLink class="h-4 w-4" />
+                                        </a>
+                                    </TitleTooltip>
+                                    <TitleTooltip :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')">
+                                        <button
+                                            @click.stop="toggleSave(article)"
+                                            :disabled="isSaving(article.id)"
+                                            class="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary disabled:cursor-not-allowed"
+                                        >
+                                            <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
+                                            <Bookmark v-else class="h-4 w-4" />
+                                        </button>
+                                    </TitleTooltip>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+
+                <!-- Search skeleton while loading more -->
+                <div v-if="isLoadingMoreSearch" :class="['mt-4', viewMode === 'grid' ? gridClass : 'space-y-3']">
+                    <div
+                        v-for="n in 4"
+                        :key="n"
+                        :class="[
+                            'animate-pulse overflow-hidden rounded-xl border border-border bg-card',
+                            viewMode !== 'grid' ? 'flex gap-4 p-4' : '',
+                        ]"
+                    >
+                        <div
+                            v-if="viewMode !== 'compact'"
+                            :class="viewMode === 'grid' ? 'h-40 w-full bg-muted' : 'h-20 w-32 shrink-0 rounded-lg bg-muted'"
+                        />
+                        <div :class="['space-y-2', viewMode === 'grid' ? 'p-4' : 'flex-1']">
+                            <div class="h-4 w-3/4 rounded bg-muted" />
+                            <div class="h-3 w-full rounded bg-muted" />
+                            <div class="h-3 w-1/2 rounded bg-muted" />
+                        </div>
                     </div>
+                </div>
 
-                    <ul v-else-if="searchResults.length > 0" :class="viewMode === 'grid' ? gridClass : 'space-y-3'">
+                <!-- Search Load More -->
+                <div v-if="searchHasMore && !isSearching && !isLoadingMoreSearch" class="mt-6 flex justify-center">
+                    <button
+                        @click="loadMoreSearchResults()"
+                        class="cursor-pointer rounded-lg border border-border bg-card px-6 py-2.5 text-sm font-medium text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
+                    >
+                        {{ t('general.load_more') }}
+                    </button>
+                </div>
+            </template>
+            <!-- end search results -->
+
+            <!-- ── Regular feed ────────────────────────────────────────── -->
+            <template v-else>
+                <div v-if="loading" class="py-12 text-center text-muted-foreground">{{ t('general.loading') }}</div>
+
+                <div v-else-if="articles.length === 0" class="py-12 text-center text-muted-foreground">
+                    <Rss class="mx-auto mb-3 h-10 w-10 opacity-40" />
+                    <p>{{ t('general.no_results') }}</p>
+                </div>
+
+                <!-- Article groups by date -->
+                <template v-else v-for="group in groupedArticles" :key="group.key">
+                    <h2 class="mt-6 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase first:mt-0">
+                        {{ group.label }}
+                    </h2>
+
+                    <ul :class="viewMode === 'grid' ? gridClass : 'space-y-3'">
                         <li
-                            v-for="article in searchResults"
+                            v-for="article in group.items"
                             :key="article.id"
+                            :data-article-id="article.id"
                             @click="openReader(article)"
                             :class="[
                                 'cursor-pointer rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md',
                                 viewMode === 'grid' ? 'flex flex-col overflow-hidden' : 'flex gap-4 p-4',
                             ]"
                         >
+                            <!-- Thumbnail or placeholder — hidden in compact mode -->
                             <template v-if="viewMode !== 'compact'">
                                 <img
                                     v-if="article.thumbnail_url"
@@ -594,6 +890,7 @@ watch(loadMoreBtn, (btn) => {
                                 </div>
                             </template>
 
+                            <!-- Content -->
                             <div :class="['flex min-w-0 flex-1 flex-col gap-1', viewMode === 'grid' ? 'p-4' : '']">
                                 <span
                                     :class="[
@@ -651,195 +948,41 @@ watch(loadMoreBtn, (btn) => {
                             </div>
                         </li>
                     </ul>
+                </template>
 
-                    <!-- Search skeleton while loading more -->
-                    <div v-if="isLoadingMoreSearch" :class="['mt-4', viewMode === 'grid' ? gridClass : 'space-y-3']">
+                <!-- Skeleton cards while loading more -->
+                <div v-if="loadingMore" :class="['mt-4', viewMode === 'grid' ? gridClass : 'space-y-3']">
+                    <div
+                        v-for="n in 4"
+                        :key="n"
+                        :class="[
+                            'animate-pulse overflow-hidden rounded-xl border border-border bg-card',
+                            viewMode !== 'grid' ? 'flex gap-4 p-4' : '',
+                        ]"
+                    >
                         <div
-                            v-for="n in 4"
-                            :key="n"
-                            :class="[
-                                'animate-pulse overflow-hidden rounded-xl border border-border bg-card',
-                                viewMode !== 'grid' ? 'flex gap-4 p-4' : '',
-                            ]"
-                        >
-                            <div
-                                v-if="viewMode !== 'compact'"
-                                :class="viewMode === 'grid' ? 'h-40 w-full bg-muted' : 'h-20 w-32 shrink-0 rounded-lg bg-muted'"
-                            />
-                            <div :class="['space-y-2', viewMode === 'grid' ? 'p-4' : 'flex-1']">
-                                <div class="h-4 w-3/4 rounded bg-muted" />
-                                <div class="h-3 w-full rounded bg-muted" />
-                                <div class="h-3 w-1/2 rounded bg-muted" />
-                            </div>
+                            v-if="viewMode !== 'compact'"
+                            :class="viewMode === 'grid' ? 'h-40 w-full bg-muted' : 'h-20 w-32 shrink-0 rounded-lg bg-muted'"
+                        />
+                        <div :class="['space-y-2', viewMode === 'grid' ? 'p-4' : 'flex-1']">
+                            <div class="h-4 w-3/4 rounded bg-muted" />
+                            <div class="h-3 w-full rounded bg-muted" />
+                            <div class="h-3 w-1/2 rounded bg-muted" />
                         </div>
                     </div>
+                </div>
 
-                    <!-- Search Load More -->
-                    <div v-if="searchHasMore && !isSearching && !isLoadingMoreSearch" class="mt-6 flex justify-center">
-                        <button
-                            @click="loadMoreSearchResults()"
-                            class="cursor-pointer rounded-lg border border-border bg-card px-6 py-2.5 text-sm font-medium text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
-                        >
-                            {{ t('general.load_more') }}
-                        </button>
-                    </div>
-                </template>
-                <!-- end search results -->
-
-                <!-- ── Regular feed ────────────────────────────────────────── -->
-                <template v-else>
-                    <div v-if="loading" class="py-12 text-center text-muted-foreground">{{ t('general.loading') }}</div>
-
-                    <div v-else-if="articles.length === 0" class="py-12 text-center text-muted-foreground">
-                        <Rss class="mx-auto mb-3 h-10 w-10 opacity-40" />
-                        <p>{{ t('general.no_results') }}</p>
-                    </div>
-
-                    <!-- Article groups by date -->
-                    <template v-else v-for="group in groupedArticles" :key="group.key">
-                        <h2 class="mt-6 mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase first:mt-0">
-                            {{ group.label }}
-                        </h2>
-
-                        <ul :class="viewMode === 'grid' ? gridClass : 'space-y-3'">
-                            <li
-                                v-for="article in group.items"
-                                :key="article.id"
-                                @click="openReader(article)"
-                                :class="[
-                                    'cursor-pointer rounded-xl border border-border bg-card shadow-sm transition hover:shadow-md',
-                                    viewMode === 'grid' ? 'flex flex-col overflow-hidden' : 'flex gap-4 p-4',
-                                ]"
-                            >
-                                <!-- Thumbnail or placeholder — hidden in compact mode -->
-                                <template v-if="viewMode !== 'compact'">
-                                    <img
-                                        v-if="article.thumbnail_url"
-                                        :src="article.thumbnail_url"
-                                        :alt="article.title"
-                                        loading="lazy"
-                                        referrerpolicy="no-referrer"
-                                        :class="
-                                            viewMode === 'grid'
-                                                ? 'h-44 w-full shrink-0 object-cover'
-                                                : 'h-20 w-32 shrink-0 rounded-lg object-cover sm:h-24 sm:w-36'
-                                        "
-                                        @error="($event.target as HTMLImageElement).style.display = 'none'"
-                                    />
-                                    <div
-                                        v-else
-                                        :class="[
-                                            'flex shrink-0 items-center justify-center bg-linear-to-br from-muted/60 to-muted',
-                                            viewMode === 'grid' ? 'h-44 w-full' : 'h-20 w-32 rounded-lg sm:h-24 sm:w-36',
-                                        ]"
-                                    >
-                                        <img
-                                            v-if="article.feed?.favicon_url"
-                                            :src="article.feed.favicon_url"
-                                            loading="lazy"
-                                            referrerpolicy="no-referrer"
-                                            class="h-8 w-8 rounded-sm object-contain opacity-40"
-                                            alt=""
-                                            @error="($event.target as HTMLImageElement).style.display = 'none'"
-                                        />
-                                        <Rss v-else class="h-8 w-8 text-muted-foreground/30" />
-                                    </div>
-                                </template>
-
-                                <!-- Content -->
-                                <div :class="['flex min-w-0 flex-1 flex-col gap-1', viewMode === 'grid' ? 'p-4' : '']">
-                                    <span
-                                        :class="[
-                                            'line-clamp-2 leading-snug font-semibold transition-colors',
-                                            readIds.has(article.id) ? 'text-muted-foreground' : '',
-                                        ]"
-                                    >
-                                        {{ article.title }}
-                                    </span>
-                                    <p v-if="article.description" class="line-clamp-2 text-sm text-muted-foreground">
-                                        {{ stripHtml(article.description) }}
-                                    </p>
-                                    <div class="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-muted-foreground">
-                                        <div class="flex min-w-0 items-center gap-3">
-                                            <span class="flex min-w-0 items-center gap-1.5">
-                                                <img
-                                                    v-if="article.feed?.favicon_url"
-                                                    :src="article.feed.favicon_url"
-                                                    referrerpolicy="no-referrer"
-                                                    class="h-3.5 w-3.5 shrink-0 rounded-sm object-contain"
-                                                    @error="($event.target as HTMLImageElement).style.display = 'none'"
-                                                    alt=""
-                                                />
-                                                <Rss v-else class="h-3 w-3 shrink-0" />
-                                                <span :class="['truncate', viewMode === 'grid' ? 'max-w-32' : 'max-w-28 sm:max-w-none']">{{
-                                                    article.feed?.name
-                                                }}</span>
-                                            </span>
-                                            <span v-if="article.published_at" class="shrink-0">{{ formatDate(article.published_at) }}</span>
-                                        </div>
-                                        <div class="flex shrink-0 items-center gap-2">
-                                            <TitleTooltip :title="t('general.read_more')">
-                                                <a
-                                                    :href="article.link"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    class="flex cursor-pointer items-center gap-1 hover:text-foreground"
-                                                    @click.stop
-                                                >
-                                                    <ExternalLink class="h-4 w-4" />
-                                                </a>
-                                            </TitleTooltip>
-                                            <TitleTooltip :title="savedIds.has(article.id) ? t('general.remove_saved') : t('general.read_later')">
-                                                <button
-                                                    @click.stop="toggleSave(article)"
-                                                    :disabled="isSaving(article.id)"
-                                                    class="flex cursor-pointer items-center gap-1 transition-colors hover:text-primary disabled:cursor-not-allowed"
-                                                >
-                                                    <BookmarkCheck v-if="savedIds.has(article.id)" class="h-4 w-4 text-primary" />
-                                                    <Bookmark v-else class="h-4 w-4" />
-                                                </button>
-                                            </TitleTooltip>
-                                        </div>
-                                    </div>
-                                </div>
-                            </li>
-                        </ul>
-                    </template>
-
-                    <!-- Skeleton cards while loading more -->
-                    <div v-if="loadingMore" :class="['mt-4', viewMode === 'grid' ? gridClass : 'space-y-3']">
-                        <div
-                            v-for="n in 4"
-                            :key="n"
-                            :class="[
-                                'animate-pulse overflow-hidden rounded-xl border border-border bg-card',
-                                viewMode !== 'grid' ? 'flex gap-4 p-4' : '',
-                            ]"
-                        >
-                            <div
-                                v-if="viewMode !== 'compact'"
-                                :class="viewMode === 'grid' ? 'h-40 w-full bg-muted' : 'h-20 w-32 shrink-0 rounded-lg bg-muted'"
-                            />
-                            <div :class="['space-y-2', viewMode === 'grid' ? 'p-4' : 'flex-1']">
-                                <div class="h-4 w-3/4 rounded bg-muted" />
-                                <div class="h-3 w-full rounded bg-muted" />
-                                <div class="h-3 w-1/2 rounded bg-muted" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Load More button -->
-                    <div ref="loadMoreBtn" v-if="hasMore && !loadingMore && !loading" class="mt-6 flex justify-center">
-                        <button
-                            @click="loadArticles(false)"
-                            class="cursor-pointer rounded-lg border border-border bg-card px-6 py-2.5 text-sm font-medium text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
-                        >
-                            {{ t('general.load_more') }}
-                        </button>
-                    </div>
-                </template>
-                <!-- end regular feed -->
-            </div>
+                <!-- Load More button -->
+                <div ref="loadMoreBtn" v-if="hasMore && !loadingMore && !loading" class="mt-6 flex justify-center">
+                    <button
+                        @click="loadArticles(false)"
+                        class="cursor-pointer rounded-lg border border-border bg-card px-6 py-2.5 text-sm font-medium text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
+                    >
+                        {{ t('general.load_more') }}
+                    </button>
+                </div>
+            </template>
+            <!-- end regular feed -->
         </div>
 
         <!-- ── Feed Customization Modal ─────────────────────────────────────── -->

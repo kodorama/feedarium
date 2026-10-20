@@ -19,6 +19,7 @@ final class ListNewsController extends Controller
             ->when($request->filled('feed_id'), fn ($q) => $q->where('feed_id', $request->integer('feed_id')))
             ->when($request->filled('category_id'), fn ($q) => $q->whereHas('feed', fn ($q2) => $q2->where('category_id', $request->integer('category_id'))))
             ->when($request->boolean('unread_only'), fn ($q) => $q->where('is_read', false))
+            ->when($request->filled('snapshot_id'), fn ($q) => $q->where('id', '<=', max(0, $request->integer('snapshot_id'))))
             ->orderByDesc('published_at')
             ->orderByDesc('id')
             ->cursorPaginate($perPage);

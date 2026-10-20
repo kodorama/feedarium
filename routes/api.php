@@ -34,6 +34,7 @@ use App\Domains\News\Controllers\ScoutSyncSettingsController;
 use App\Domains\Category\Controllers\CreateCategoryController;
 use App\Domains\Category\Controllers\DeleteCategoryController;
 use App\Domains\Category\Controllers\UpdateCategoryController;
+use App\Domains\News\Controllers\GetNewsUpdateCountController;
 use App\Domains\Settings\Controllers\UpdateSettingsController;
 
 // WebSub (PubSubHubbub) callbacks — no auth, hub must reach these
@@ -61,6 +62,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // News / Articles
     Route::get('/news', ListNewsController::class);
+    Route::get('/news/updates', GetNewsUpdateCountController::class);
+    Route::post('/news/updates', GetNewsUpdateCountController::class);
     Route::get('/news/search', SearchNewsController::class);
     Route::get('/news/saved', ListSavedArticlesController::class);
     Route::post('/news/read-all', MarkAllAsReadController::class);

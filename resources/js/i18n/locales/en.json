@@ -96,7 +96,7 @@
         "today": "Today",
         "yesterday": "Yesterday",
         "unknown_date": "Unknown date",
-        "new_available": "New articles are available. Refresh to see them.",
+        "new_available": "{count} new articles are available. Refresh to see them.",
         "no_preview": "No preview available.",
         "searching": "Searching…",
         "search_results": "Search results",

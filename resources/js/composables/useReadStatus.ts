@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ref, triggerRef } from 'vue';
+import { FeedUnreadCountState, runOptimisticMutation, type UnreadCountRequestToken } from './feedUnreadCounts';
 
 export interface MarkAllParams {
     feedId?: number;
@@ -15,10 +16,29 @@ const _markAllSignal = ref<(MarkAllParams & { nonce: number }) | null>(null);
 const _feedReadDelta = ref(new Map<number, number>());
 /** feedIds where mark-all-read has been triggered — sidebar shows 0 for these */
 const _zeroedFeeds = ref(new Set<number>());
+const _unreadCountSnapshotVersion = ref(0);
+const _unreadCounts = new FeedUnreadCountState();
 
 // ---------------------------------------------------------------------------
 
 export function useReadStatus() {
+    function syncUnreadCountRefs(): void {
+        _feedReadDelta.value = _unreadCounts.getReadDeltas();
+        _zeroedFeeds.value = _unreadCounts.getZeroedFeeds();
+        triggerRef(_feedReadDelta);
+        triggerRef(_zeroedFeeds);
+    }
+
+    function beginUnreadCountRequest(): UnreadCountRequestToken {
+        return _unreadCounts.beginSnapshotRequest();
+    }
+
+    function acceptUnreadCountSnapshot(counts: Record<number, number>, token: UnreadCountRequestToken): void {
+        if (!_unreadCounts.acceptSnapshot(counts, token)) return;
+        _unreadCountSnapshotVersion.value++;
+        syncUnreadCountRefs();
+    }
+
     function isRead(id: number): boolean {
         return _readIds.value.has(id);
     }
@@ -27,7 +47,8 @@ export function useReadStatus() {
         _readIds.value.add(id);
         triggerRef(_readIds);
         if (feedId != null) {
-            _feedReadDelta.value.set(feedId, (_feedReadDelta.value.get(feedId) ?? 0) + 1);
+            _unreadCounts.addRead(feedId);
+            _feedReadDelta.value = _unreadCounts.getReadDeltas();
             triggerRef(_feedReadDelta);
         }
     }
@@ -36,11 +57,10 @@ export function useReadStatus() {
         for (let i = 0; i < ids.length; i++) {
             _readIds.value.add(ids[i]);
             const fid = feedIds?.[i];
-            if (fid != null) {
-                _feedReadDelta.value.set(fid, (_feedReadDelta.value.get(fid) ?? 0) + 1);
-            }
+            if (fid != null) _unreadCounts.addRead(fid);
         }
         triggerRef(_readIds);
+        _feedReadDelta.value = _unreadCounts.getReadDeltas();
         triggerRef(_feedReadDelta);
     }
 
@@ -54,53 +74,59 @@ export function useReadStatus() {
     async function markAsRead(id: number, feedId?: number): Promise<void> {
         if (_readIds.value.has(id)) return;
         addRead(id, feedId);
-        await axios.patch(`/api/news/${id}/read`).catch(() => {});
+        await runOptimisticMutation(
+            () => axios.patch(`/api/news/${id}/read`),
+            () => {
+                if (feedId != null) _unreadCounts.confirmRead(feedId);
+            },
+            () => {
+                _readIds.value.delete(id);
+                triggerRef(_readIds);
+                if (feedId != null) {
+                    _unreadCounts.rollbackRead(feedId);
+                    syncUnreadCountRefs();
+                }
+            },
+        );
     }
 
-    async function markAllAsRead(params: MarkAllParams = {}): Promise<void> {
-        await axios
-            .post('/api/news/read-all', {
-                ...(params.feedId != null && { feed_id: params.feedId }),
-                ...(params.categoryId != null && { category_id: params.categoryId }),
-            })
-            .catch(() => {});
-        _markAllSignal.value = { ...params, nonce: Date.now() };
+    async function markAllAsRead(params: MarkAllParams = {}): Promise<boolean> {
+        return runOptimisticMutation(
+            () =>
+                axios.post('/api/news/read-all', {
+                    ...(params.feedId != null && { feed_id: params.feedId }),
+                    ...(params.categoryId != null && { category_id: params.categoryId }),
+                }),
+            () => {
+                _markAllSignal.value = { ...params, nonce: Date.now() };
+            },
+            () => {},
+        );
     }
 
     /** Returns adjusted unread count: 0 if mark-all was triggered, otherwise serverCount minus local read delta. */
     function adjustedFeedCount(feedId: number, serverCount: number): number {
-        if (_zeroedFeeds.value.has(feedId)) {
-            if (serverCount === 0) {
-                // Server has caught up — remove so new items are shown correctly
-                _zeroedFeeds.value.delete(feedId);
-                triggerRef(_zeroedFeeds);
-            }
-            return 0;
-        }
-        return Math.max(0, serverCount - (_feedReadDelta.value.get(feedId) ?? 0));
+        void _unreadCountSnapshotVersion.value;
+
+        return _unreadCounts.unreadCount(feedId, serverCount);
     }
 
     /** Mark a feed's unread count as zero (called after mark-all-read for that feed). */
     function zeroFeedUnread(feedId: number): void {
-        _zeroedFeeds.value.add(feedId);
-        clearFeedDelta(feedId);
-        triggerRef(_zeroedFeeds);
+        _unreadCounts.markAll([feedId]);
+        syncUnreadCountRefs();
     }
 
     /** Mark multiple feeds' unread counts as zero in one batched update. */
     function zeroFeedsUnread(feedIds: number[]): void {
-        for (const id of feedIds) {
-            _zeroedFeeds.value.add(id);
-            _feedReadDelta.value.delete(id); // batch: skip per-item triggerRef
-        }
-        // Trigger refs once for the whole batch instead of per-feed
-        triggerRef(_zeroedFeeds);
-        triggerRef(_feedReadDelta);
+        _unreadCounts.markAll(feedIds);
+        syncUnreadCountRefs();
     }
 
     /** Zero out the delta for a feed (after mark-all). */
     function clearFeedDelta(feedId: number): void {
-        _feedReadDelta.value.delete(feedId);
+        _unreadCounts.clearReadDelta(feedId);
+        _feedReadDelta.value = _unreadCounts.getReadDeltas();
         triggerRef(_feedReadDelta);
     }
 
@@ -119,5 +145,7 @@ export function useReadStatus() {
         zeroFeedUnread,
         zeroFeedsUnread,
         clearFeedDelta,
+        beginUnreadCountRequest,
+        acceptUnreadCountSnapshot,
     };
 }

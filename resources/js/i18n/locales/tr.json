@@ -96,7 +96,7 @@
         "today": "Bugün",
         "yesterday": "Dün",
         "unknown_date": "Tarih bilinmiyor",
-        "new_available": "Yeni makaleler mevcut. Görmek için yenileyin.",
+        "new_available": "{count} yeni makale mevcut. Görmek için yenileyin.",
         "no_preview": "Önizleme yok.",
         "searching": "Aranıyor…",
         "search_results": "Arama sonuçları",

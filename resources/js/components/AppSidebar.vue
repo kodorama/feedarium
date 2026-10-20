@@ -14,11 +14,12 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
+import { TitleTooltip } from '@/components/ui/tooltip';
+import { sumCategoryUnreadCounts } from '@/composables/feedUnreadCounts';
 import { useAutoAdvance } from '@/composables/useAutoAdvance';
 import { useReadStatus } from '@/composables/useReadStatus';
-import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from '@/lib/axios';
-import { TitleTooltip } from '@/components/ui/tooltip';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { Bookmark, CheckCheck, ChevronRight, FolderOpen, LogOut, Rss, Settings, Settings2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -88,7 +89,6 @@ async function saveCustomize(): Promise<void> {
     }
 }
 
-
 const currentUrl = computed(() => page.url);
 
 const feedsByCategory = computed(() => {
@@ -115,13 +115,7 @@ const categoryUnread = computed(() => {
     // feedReadDelta and zeroedFeeds are referenced explicitly to ensure reactivity
     void feedReadDelta.value;
     void zeroedFeeds.value;
-    const map = new Map<number, number>();
-    for (const feed of sidebarFeeds.value) {
-        if (feed.category_id == null) continue;
-        const count = feedUnread(feed);
-        map.set(feed.category_id, (map.get(feed.category_id) ?? 0) + count);
-    }
-    return map;
+    return sumCategoryUnreadCounts(sidebarFeeds.value, feedUnread);
 });
 
 const expandedCategories = ref<Set<number>>(new Set());
@@ -169,14 +163,14 @@ function selectCategory(categoryId: number) {
 
 async function markAllForCategory(e: Event, categoryId: number): Promise<void> {
     e.stopPropagation();
-    await markAllAsRead({ categoryId });
+    if (!(await markAllAsRead({ categoryId }))) return;
     zeroFeedsUnread((feedsByCategory.value.get(categoryId) ?? []).map((f) => f.id));
     navigateToNextUnreadCategory(categoryId, sidebarCategories.value, categoryUnread.value);
 }
 
 async function markAllForFeed(e: Event, feedId: number): Promise<void> {
     e.stopPropagation();
-    await markAllAsRead({ feedId });
+    if (!(await markAllAsRead({ feedId }))) return;
     zeroFeedUnread(feedId);
 }
 
@@ -242,7 +236,12 @@ watch(markAllSignal, (sig) => {
                             <button @click="selectFeed(feed.id)" class="group flex w-full items-center gap-2 pr-1">
                                 <!-- Favicon / gear toggle -->
                                 <span class="relative h-4 w-4 shrink-0">
-                                    <img v-if="feed.favicon_url" :src="feed.favicon_url" class="h-4 w-4 rounded-sm object-contain transition-opacity group-hover:opacity-0" alt="" />
+                                    <img
+                                        v-if="feed.favicon_url"
+                                        :src="feed.favicon_url"
+                                        class="h-4 w-4 rounded-sm object-contain transition-opacity group-hover:opacity-0"
+                                        alt=""
+                                    />
                                     <Rss v-else class="h-4 w-4 opacity-60 transition-opacity group-hover:opacity-0" />
                                     <TitleTooltip :title="t('feeds.customize')" side="top">
                                         <span
@@ -387,7 +386,9 @@ watch(markAllSignal, (sig) => {
     <Dialog v-model:open="customizeOpen">
         <DialogContent class="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>{{ t('feeds.customize_title') }}<template v-if="customizeFeedTarget"> — {{ customizeFeedTarget.name }}</template></DialogTitle>
+                <DialogTitle
+                    >{{ t('feeds.customize_title') }}<template v-if="customizeFeedTarget"> — {{ customizeFeedTarget.name }}</template></DialogTitle
+                >
             </DialogHeader>
 
             <div class="space-y-5 py-2">
@@ -400,7 +401,7 @@ watch(markAllSignal, (sig) => {
                         class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
                     />
                     <label for="customize-disable-scraping" class="cursor-pointer space-y-0.5">
-                        <span class="block text-sm font-medium leading-snug">{{ t('feeds.disable_scraping_label') }}</span>
+                        <span class="block text-sm leading-snug font-medium">{{ t('feeds.disable_scraping_label') }}</span>
                         <span class="block text-xs text-muted-foreground">{{ t('feeds.disable_scraping_desc') }}</span>
                     </label>
                 </div>
@@ -414,7 +415,7 @@ watch(markAllSignal, (sig) => {
                         class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
                     />
                     <label for="customize-hide-image" class="cursor-pointer space-y-0.5">
-                        <span class="block text-sm font-medium leading-snug">{{ t('feeds.hide_image_label') }}</span>
+                        <span class="block text-sm leading-snug font-medium">{{ t('feeds.hide_image_label') }}</span>
                         <span class="block text-xs text-muted-foreground">{{ t('feeds.hide_image_desc') }}</span>
                     </label>
                 </div>

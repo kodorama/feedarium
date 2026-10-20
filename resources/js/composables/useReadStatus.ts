@@ -18,6 +18,7 @@ const _feedReadDelta = ref(new Map<number, number>());
 const _zeroedFeeds = ref(new Set<number>());
 const _unreadCountSnapshotVersion = ref(0);
 const _unreadCounts = new FeedUnreadCountState();
+let _markAllRequestId = 0;
 
 // ---------------------------------------------------------------------------
 
@@ -91,12 +92,28 @@ export function useReadStatus() {
     }
 
     async function markAllAsRead(params: MarkAllParams = {}): Promise<boolean> {
+        const requestId = ++_markAllRequestId;
+
         return runOptimisticMutation(
-            () =>
-                axios.post('/api/news/read-all', {
+            async () => {
+                const response = await axios.post<{
+                    unread_counts?: Record<number, number>;
+                    affected_feed_ids?: number[];
+                }>('/api/news/read-all', {
                     ...(params.feedId != null && { feed_id: params.feedId }),
                     ...(params.categoryId != null && { category_id: params.categoryId }),
-                }),
+                });
+
+                if (response.data.unread_counts && response.data.affected_feed_ids) {
+                    const applied = _unreadCounts.applyAuthoritativeSnapshot(response.data.unread_counts, response.data.affected_feed_ids, requestId);
+                    if (applied) {
+                        _unreadCountSnapshotVersion.value++;
+                        syncUnreadCountRefs();
+                    }
+                }
+
+                return response;
+            },
             () => {
                 _markAllSignal.value = { ...params, nonce: Date.now() };
             },

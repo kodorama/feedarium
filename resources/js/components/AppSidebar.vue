@@ -27,7 +27,7 @@ import AppLogo from './AppLogo.vue';
 
 const { t } = useI18n();
 const page = usePage();
-const { adjustedFeedCount, feedReadDelta, zeroedFeeds, markAllAsRead, markAllSignal, zeroFeedUnread, zeroFeedsUnread } = useReadStatus();
+const { adjustedFeedCount, feedReadDelta, zeroedFeeds, markAllAsRead, markAllSignal } = useReadStatus();
 const { navigateToNextUnreadCategory } = useAutoAdvance();
 
 interface SidebarCategory {
@@ -164,27 +164,19 @@ function selectCategory(categoryId: number) {
 async function markAllForCategory(e: Event, categoryId: number): Promise<void> {
     e.stopPropagation();
     if (!(await markAllAsRead({ categoryId }))) return;
-    zeroFeedsUnread((feedsByCategory.value.get(categoryId) ?? []).map((f) => f.id));
     navigateToNextUnreadCategory(categoryId, sidebarCategories.value, categoryUnread.value);
 }
 
 async function markAllForFeed(e: Event, feedId: number): Promise<void> {
     e.stopPropagation();
-    if (!(await markAllAsRead({ feedId }))) return;
-    zeroFeedUnread(feedId);
+    await markAllAsRead({ feedId });
 }
 
 // Handle mark-all triggered from the main toolbar (feeds/Index.vue) or anywhere else
 watch(markAllSignal, (sig) => {
     if (!sig) return;
-    if (sig.feedId != null) {
-        zeroFeedUnread(sig.feedId);
-    } else if (sig.categoryId != null) {
-        zeroFeedsUnread((feedsByCategory.value.get(sig.categoryId) ?? []).map((f) => f.id));
+    if (sig.categoryId != null) {
         navigateToNextUnreadCategory(sig.categoryId, sidebarCategories.value, categoryUnread.value);
-    } else {
-        // No filter — mark all feeds as read
-        zeroFeedsUnread(sidebarFeeds.value.map((f) => f.id));
     }
 });
 </script>

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository is a FOSS/self-hosted RSS reader built with Laravel 12, PHP 8.4, Vue 3, and Inertia.
+This repository is a FOSS/self-hosted RSS reader built with Laravel 12, PHP 8.5, Vue 3, and Inertia.
 
 This file is the source of truth for coding agents and contributors working in this repo.
 
@@ -123,7 +123,7 @@ app/
 
 ### Current stack and product rules
 
-- backend: Laravel 12 + PHP 8.4
+- backend: Laravel 12 + PHP 8.5
 - public UI: Vue 3 + Inertia
 - auth/API readiness: Laravel Sanctum (cookie-based session for Inertia, token for pure API)
 - supported databases: SQLite and PostgreSQL
@@ -1020,7 +1020,7 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 
 This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
-- php - 8.4.18
+- php - 8.5.12 or newer
 - filament/filament (FILAMENT) - v5
 - inertiajs/inertia-laravel (INERTIA_LARAVEL) - v2
 - laravel/framework (LARAVEL) - v12

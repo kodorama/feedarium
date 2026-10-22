@@ -1,5 +1,5 @@
-# PHP 8.4 (Alpine) Dockerfile for Laravel
-FROM php:8.4-fpm-alpine
+# PHP 8.5.12 (Alpine) Dockerfile for Laravel
+FROM php:8.5.12-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -28,7 +28,10 @@ RUN apk add --no-cache \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm \
-    && docker-php-ext-install -j$(nproc) gd intl pdo pdo_mysql pdo_pgsql pdo_sqlite zip bcmath opcache xml gmp
+    && docker-php-ext-install -j$(nproc) gd intl pdo pdo_mysql pdo_pgsql pdo_sqlite zip bcmath xml gmp
+
+# Fail the build if the official image tag does not contain the patched runtime.
+RUN php -r 'if (PHP_VERSION_ID < 80512) { fwrite(STDERR, "PHP 8.5.12 or newer is required.\n"); exit(1); }'
 
 # Install Composer
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer

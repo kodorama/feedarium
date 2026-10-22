@@ -140,6 +140,7 @@
             "reading": "Okuma",
             "categories": "Kategoriler",
             "feeds": "Akış Kaynakları",
+            "import_export": "İçe / Dışa Aktar",
             "search": "Arama",
             "advanced": "Gelişmiş"
         },
@@ -151,8 +152,36 @@
             "reading": "Okuma",
             "categories": "Kategoriler",
             "feeds": "Akış Kaynakları",
+            "import_export": "İçe / Dışa Aktar",
             "search": "Arama",
             "advanced": "Gelişmiş"
+        },
+        "opml": {
+            "title": "OPML abonelikleri",
+            "description": "Paylaşılan akış listesini dışa aktarın veya OPML 2.0 dosyasından abonelik içe aktarın.",
+            "export": "OPML dışa aktar",
+            "import_title": "Abonelikleri içe aktar",
+            "import_description": "İçe aktarmadan önce akışları önizleyin. Mevcut abonelikler, yinelenen URL'ler, desteklenmeyen şemalar ve geçersiz veya güvenli olmayan URL'ler ayrı gösterilir. Akış kayıtları şimdi oluşturulur; alma işlemi arka planda çalışır.",
+            "file_label": "OPML dosyası",
+            "preview": "Dosyayı önizle",
+            "previewing": "Dosya okunuyor…",
+            "import": "{count} yeni akışı içe aktar",
+            "importing": "İçe aktarılıyor…",
+            "confirm_import": "{count} yeni akış içe aktarılsın mı?",
+            "import_complete": "İçe aktarma tamamlandı. İlk akış alma işlemleri kuyruğa alındı.",
+            "preview_failed": "OPML dosyası önizlenemedi.",
+            "import_failed": "OPML içe aktarma tamamlanamadı.",
+            "feed_count": "Geçerli akışlar",
+            "new_feeds": "Yeni akışlar",
+            "existing_feeds": "Zaten abone olunanlar",
+            "duplicates": "Yinelenenler",
+            "unsupported": "Desteklenmeyen şema",
+            "invalid": "Geçersiz veya güvenli olmayan",
+            "categories": "Kategoriler",
+            "categories_created": "Oluşturulan kategoriler",
+            "created": "Oluşturulan akışlar",
+            "failures": "Hatalar",
+            "already_subscribed": "Zaten abone olunmuş"
         },
         "profile": {
             "profile_information": "Profil bilgileri",
@@ -243,4 +272,3 @@
         }
     }
 }
-

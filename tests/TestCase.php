@@ -7,6 +7,16 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    public function createApplication()
+    {
+        $app = parent::createApplication();
+        $app->bind(\App\Support\OutboundHttp\OutboundHostResolver::class, \Tests\Support\FakeOutboundHostResolver::class);
+        $app->bind(\App\Support\OutboundHttp\OutboundPeerAddressVerifier::class, \Tests\Support\FakeOutboundPeerAddressVerifier::class);
+        $app->bind(\App\Support\OutboundHttp\OutboundHttpHandlerFactory::class, \Tests\Support\FakeOutboundHttpHandlerFactory::class);
+
+        return $app;
+    }
+
     /**
      * Validate the booted database configuration before RefreshDatabase can migrate it.
      *

@@ -17,8 +17,11 @@ Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vu
 - **Feed Management**: Easily add, organize, and categorize your RSS feeds.
 - **Article Filtering & Search**: Quickly find the content you're looking for.
 - **Reading Experience**: Comfortable reading view with adjustable text size and theme options.
+- **OPML 2.0 Subscriptions**: Import and export subscriptions for FreshRSS, Inoreader, and other OPML-compatible readers.
 - **Mobile Friendly**: Responsive design that works on all your devices.
 - [**Self-Hosted**](#self-hosting-with-portainer-casaos-or-any-docker-host): Own your data and reading habits by hosting Feedarium on your own server.
+
+Admins can preview, import, and export subscriptions at **Settings → Import / Export**. Existing feeds and duplicate entries are identified before import; categories are preserved, with nested folders flattened into path names. This transfers subscriptions and categories only—it does not migrate article history, read state, favorites, or preferences. OPML interoperability is provided for compatible readers; proprietary vendor-specific formats are not supported.
 
 ## Screenshots
 
@@ -31,6 +34,15 @@ Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vu
 - Composer
 - Node.js & NPM
 - Docker & Docker Compose (for Docker installation)
+
+## Outbound request security
+
+Feed fetches, article enrichment, and WebSub hub subscriptions use a shared
+outbound HTTP policy. It accepts only HTTP(S) URLs with public destinations,
+checks every DNS answer and pins the connection to a validated address. Redirects
+are followed manually with the destination checked again; proxy use is disabled.
+Responses have bounded sizes and timeouts. See [the security notes](docs/security.md)
+for the scope and operational behavior.
 
 ## Installation
 

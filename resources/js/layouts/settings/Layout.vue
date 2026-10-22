@@ -21,6 +21,7 @@ const sidebarNavItems = computed<NavItem[]>(() => [
     { title: t('settings.nav.feeds'), href: '/settings/feeds' },
     ...(isAdmin.value
         ? [
+              { title: t('settings.nav.import_export'), href: '/settings/import-export' },
               { title: t('settings.nav.search'), href: '/settings/search' },
               { title: t('settings.nav.advanced'), href: '/settings/advanced' },
           ]

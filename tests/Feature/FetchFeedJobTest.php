@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use App\Domains\Feed\Jobs\FetchFeedJob;
 use App\Domains\Feed\Jobs\ImportFeedItemsJob;
+use App\Domains\News\Jobs\PublisherRequestGate;
 use Illuminate\Http\Client\ConnectionException;
+use App\Domains\News\Jobs\RateLimitPublisherRequests;
 
 describe('FetchFeedJob', function () {
     beforeEach(function () {
@@ -80,6 +82,52 @@ describe('FetchFeedJob', function () {
         $this->app->call([$job, 'handle']);
 
         Queue::assertNotPushed(ImportFeedItemsJob::class);
+    });
+
+    it('resumes a validated redirect at its target after the redirect gate defers', function () {
+        config(['feedarium.publisher_throttle.cache_store' => 'array']);
+        \Illuminate\Support\Facades\Cache::store('array')->flush();
+        $feed = Feed::factory()->create(['active' => true, 'url' => 'https://example.com/feed.xml']);
+        $target = 'https://redirect.example/feed.xml';
+        $gate = app(PublisherRequestGate::class);
+        $releasedDelay = null;
+        Http::fakeSequence()
+            ->push('', 302, ['Location' => $target])
+            ->push('<rss></rss>', 200);
+
+        $queueJob = Mockery::mock(\Illuminate\Contracts\Queue\Job::class);
+        $queueJob->shouldReceive('release')->once()->withArgs(function (int $delay) use (&$releasedDelay): bool {
+            $releasedDelay = $delay;
+
+            return $delay > 0;
+        });
+        $job = new FetchFeedJob($feed->id);
+        $job->setJob($queueJob);
+        $middleware = app(RateLimitPublisherRequests::class);
+        $runHandle = fn () => $this->app->call([$job, 'handle']);
+
+        $middleware->handle($job, static function () use ($runHandle): void {
+            $runHandle();
+        });
+
+        expect($job->continuationUrl)->toBe($target)
+            ->and($job->publisherUrl())->toBe($target)
+            ->and($releasedDelay)->toBeGreaterThan(0);
+
+        // Simulate the elapsed delay using the isolated test cache, then let the real middleware reserve the continuation destination.
+        \Illuminate\Support\Facades\Cache::store('array')->put('feedarium:publisher:global', microtime(true) - 1, 120);
+
+        $middleware->handle($job, static function () use ($runHandle): void {
+            $runHandle();
+        });
+
+        Http::assertSentCount(2);
+        Http::assertSentInOrder([
+            fn ($request) => $request->url() === $feed->url,
+            fn ($request) => $request->url() === $target,
+        ]);
+        Queue::assertPushed(ImportFeedItemsJob::class, fn ($queued) => $queued->feedId === $feed->id);
+        expect($job->continuationUrl)->toBeNull();
     });
 
     it('logs and rethrows connection errors so the queue can retry the job', function () {

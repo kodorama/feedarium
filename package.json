@@ -1,6 +1,9 @@
 {
     "private": true,
     "type": "module",
+    "engines": {
+        "node": ">=22.23.4 <23"
+    },
     "scripts": {
         "build": "vite build",
         "build:ssr": "vite build && vite build --ssr",

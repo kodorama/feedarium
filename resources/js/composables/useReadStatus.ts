@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { ref, triggerRef } from 'vue';
-import { FeedUnreadCountState, runOptimisticMutation, type UnreadCountRequestToken } from './feedUnreadCounts';
+import { FeedUnreadCountState, runOptimisticMutation, runOptimisticRead, type UnreadCountRequestToken } from './feedUnreadCounts';
 
 export interface MarkAllParams {
     feedId?: number;
@@ -73,9 +73,9 @@ export function useReadStatus() {
     }
 
     async function markAsRead(id: number, feedId?: number): Promise<void> {
-        if (_readIds.value.has(id)) return;
-        addRead(id, feedId);
-        await runOptimisticMutation(
+        await runOptimisticRead(
+            () => _readIds.value.has(id),
+            () => addRead(id, feedId),
             () => axios.patch(`/api/news/${id}/read`),
             () => {
                 if (feedId != null) _unreadCounts.confirmRead(feedId);
@@ -124,6 +124,8 @@ export function useReadStatus() {
     /** Returns adjusted unread count: 0 if mark-all was triggered, otherwise serverCount minus local read delta. */
     function adjustedFeedCount(feedId: number, serverCount: number): number {
         void _unreadCountSnapshotVersion.value;
+        void _feedReadDelta.value;
+        void _zeroedFeeds.value;
 
         return _unreadCounts.unreadCount(feedId, serverCount);
     }

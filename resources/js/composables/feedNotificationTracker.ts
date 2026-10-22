@@ -32,6 +32,7 @@ export class FeedNotificationTracker {
     private generation = 0;
     private revision = 0;
     private checking = false;
+    private inFlightRequest: Promise<FeedUpdateResponse> | null = null;
     private initialized = false;
     private count = 0;
     private readonly request: FeedUpdateRequest;
@@ -90,7 +91,7 @@ export class FeedNotificationTracker {
         const acknowledgedId = this.acknowledgedId;
 
         try {
-            const response = await this.request(
+            const request = this.request(
                 {
                     ...filters,
                     after_id: acknowledgedId,
@@ -98,15 +99,21 @@ export class FeedNotificationTracker {
                 },
                 'POST',
             );
+            this.inFlightRequest = request;
+            const response = await request;
+            // Poll responses always report the global latest article ID. Keep
+            // that monotonic high-water knowledge even when their count is
+            // stale, so a refresh can recount rows beyond its list snapshot.
+            this.importedId = Math.max(this.importedId ?? 0, response.latest_id);
             if (generation !== this.generation || revision !== this.revision) return;
 
-            this.importedId = Math.max(this.importedId ?? 0, response.latest_id);
             this.count = response.count;
             if (this.count === 0) this.acknowledgeThrough(response.latest_id);
         } catch {
             // Keep the previous imported watermark and count; a later poll retries.
         } finally {
             this.checking = false;
+            this.inFlightRequest = null;
         }
     }
 
@@ -124,14 +131,26 @@ export class FeedNotificationTracker {
             if (id > this.acknowledgedId && id <= snapshotId) this.displayedIds.add(id);
         }
         this.revision++;
-        if (this.checking) return false;
+
+        // A poll or an earlier acknowledgement may already be using the shared
+        // request slot. Wait for it, then reconcile this newest displayed set.
+        while (this.checking) {
+            const inFlightRequest = this.inFlightRequest;
+            if (inFlightRequest === null) return false;
+            try {
+                await inFlightRequest;
+            } catch {
+                // A failed poll must not discard this display acknowledgement.
+            }
+            if (generation !== this.generation) return false;
+        }
 
         this.checking = true;
         const revision = this.revision;
         const acknowledgedId = this.acknowledgedId;
 
         try {
-            const response = await this.request(
+            const request = this.request(
                 {
                     ...filters,
                     after_id: acknowledgedId,
@@ -140,12 +159,14 @@ export class FeedNotificationTracker {
                 },
                 'POST',
             );
+            this.inFlightRequest = request;
+            const response = await request;
             if (generation !== this.generation || revision !== this.revision) return false;
 
             let pendingCount = response.count;
             const latestId = Math.max(this.importedId ?? 0, response.latest_id);
             if (latestId > snapshotId) {
-                const remaining = await this.request(
+                const remainingRequest = this.request(
                     {
                         ...filters,
                         after_id: snapshotId,
@@ -153,6 +174,8 @@ export class FeedNotificationTracker {
                     },
                     'POST',
                 );
+                this.inFlightRequest = remainingRequest;
+                const remaining = await remainingRequest;
                 if (generation !== this.generation || revision !== this.revision) return false;
 
                 pendingCount += remaining.count;
@@ -173,6 +196,7 @@ export class FeedNotificationTracker {
             return false;
         } finally {
             this.checking = false;
+            this.inFlightRequest = null;
         }
     }
 

@@ -32,7 +32,7 @@ Admins can preview, import, and export subscriptions at **Settings → Import / 
 
 - PHP 8.5.12 or higher (security-patched baseline)
 - Composer
-- Node.js & NPM
+- Node.js 22.23.4 or a later Node.js 22 release, with npm (the exact project baseline is in `.nvmrc`)
 - Docker & Docker Compose (for Docker installation)
 
 ## Outbound request security

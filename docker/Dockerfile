@@ -42,8 +42,13 @@ RUN composer global require nunomaduro/larastan friendsofphp/php-cs-fixer --pref
 # Add Composer global bin to PATH
 ENV PATH="/root/.composer/vendor/bin:$PATH"
 
-# Install Node.js and npm for frontend asset building
-RUN apk add --no-cache nodejs npm
+# Use the same exact Node.js security baseline as CI and production asset builds.
+COPY --from=node:22.23.4-alpine /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22.23.4-alpine /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN apk add --no-cache libatomic libstdc++ \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+    && test "$(node --version)" = "v22.23.4"
 
 ENV APPUSER=feedarium
 

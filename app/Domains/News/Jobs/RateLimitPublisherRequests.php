@@ -4,11 +4,16 @@ namespace App\Domains\News\Jobs;
 
 use RuntimeException;
 use Illuminate\Support\Facades\Log;
+use App\Support\OutboundHttp\PublisherRedirectContinuationAware;
+use App\Support\OutboundHttp\PublisherRedirectContinuationStore;
 
 /** Releases queue work until a shared publisher/global request slot is available. */
 final class RateLimitPublisherRequests
 {
-    public function __construct(private readonly PublisherRequestGate $gate) {}
+    public function __construct(
+        private readonly PublisherRequestGate $gate,
+        private readonly PublisherRedirectContinuationStore $continuations,
+    ) {}
 
     public function handle(object $job, \Closure $next): void
     {
@@ -16,6 +21,10 @@ final class RateLimitPublisherRequests
             $job->release(30);
 
             return;
+        }
+
+        if ($job instanceof PublisherRedirectContinuationAware) {
+            $job->restorePublisherRedirectContinuation($this->continuations);
         }
 
         $reservation = $this->gate->reserve($job->publisherUrl());

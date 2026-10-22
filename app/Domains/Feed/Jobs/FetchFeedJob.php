@@ -7,15 +7,21 @@ use App\Models\Feed;
 use RuntimeException;
 use Illuminate\Bus\Queueable;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use App\Domains\News\Jobs\PublisherRequestGate;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use App\Support\OutboundHttp\SafeOutboundResponse;
+use App\Support\OutboundHttp\SafeOutboundHttpClient;
 use App\Domains\News\Jobs\RateLimitPublisherRequests;
+use App\Support\OutboundHttp\OutboundRequestDeferred;
+use App\Support\OutboundHttp\OutboundRequestRejected;
+use App\Support\OutboundHttp\HasPublisherRedirectContinuation;
+use App\Support\OutboundHttp\PublisherRedirectContinuationAware;
+use App\Support\OutboundHttp\PublisherRedirectContinuationStore;
 
 /**
  * Fetches the raw RSS/Atom feed XML for a given Feed record.
@@ -34,9 +40,10 @@ use App\Domains\News\Jobs\RateLimitPublisherRequests;
  * a consistent Feedarium User-Agent and forcing HTTP/1.1 (the server's HTTP/2
  * implementation is broken and returns PROTOCOL_ERROR) resolves both issues.
  */
-final class FetchFeedJob implements ShouldQueue
+final class FetchFeedJob implements PublisherRedirectContinuationAware, ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use HasPublisherRedirectContinuation;
 
     public int $maxExceptions = 5;
 
@@ -70,7 +77,7 @@ final class FetchFeedJob implements ShouldQueue
 
     public function publisherUrl(): ?string
     {
-        return Feed::query()->whereKey($this->feedId)->value('url');
+        return $this->continuationUrl ?? Feed::query()->whereKey($this->feedId)->value('url');
     }
 
     public function retryUntil(): \DateTimeInterface
@@ -80,33 +87,40 @@ final class FetchFeedJob implements ShouldQueue
 
     public function __construct(public readonly int $feedId) {}
 
-    public function handle(PublisherRequestGate $gate): void
+    public function handle(PublisherRequestGate $gate, SafeOutboundHttpClient $client, PublisherRedirectContinuationStore $continuations): void
     {
+        $this->restorePublisherRedirectContinuation($continuations);
         $feed = Feed::query()->findOrFail($this->feedId);
 
         $headers = [];
 
-        if ($feed->etag) {
+        $requestUrl = $this->continuationUrl ?? $feed->url;
+        if ($this->continuationUrl === null && $feed->etag) {
             $headers['If-None-Match'] = $feed->etag;
         }
 
-        if ($feed->last_modified_header) {
+        if ($this->continuationUrl === null && $feed->last_modified_header) {
             $headers['If-Modified-Since'] = $feed->last_modified_header;
         }
 
         try {
-            $response = Http::withHeaders($headers)
-                ->withUserAgent(
-                    'Feedarium/1.0 (+https://github.com/kodorama/feedarium)'
-                )
-                ->connectTimeout(15)
-                ->timeout(30)
-                ->withOptions([
-                    'curl' => [
-                        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                    ],
-                ])
-                ->get($feed->url);
+            $headers['User-Agent'] = 'Feedarium/1.0 (+https://github.com/kodorama/feedarium)';
+            $response = $client->get($requestUrl, $headers, 10_485_760, function (string $url, string $method, int $redirects, array $visited) use ($gate, $continuations): void {
+                $this->savePublisherRedirectContinuation($continuations, $url, $method, $redirects, $visited);
+                $reservation = $gate->reserve($url);
+                if (! $reservation['allowed']) {
+                    throw new OutboundRequestDeferred($reservation['delay']);
+                }
+            }, $this->continuationRedirects, $this->continuationVisited);
+        } catch (OutboundRequestDeferred $exception) {
+            $this->release($exception->delaySeconds);
+
+            return;
+        } catch (OutboundRequestRejected $exception) {
+            $this->clearPublisherRedirectContinuation($continuations);
+            Log::warning('FetchFeedJob: outbound request blocked', ['feed_id' => $this->feedId, 'reason' => $exception->reason]);
+
+            return;
         } catch (ConnectionException $exception) {
             Log::warning('FetchFeedJob: connection error', [
                 'feed_id' => $this->feedId,
@@ -118,10 +132,9 @@ final class FetchFeedJob implements ShouldQueue
             throw $exception;
         }
 
-        $gate->recordRedirect($feed->url, (string) $response->effectiveUri());
-
         // 304 Not Modified — skip import, just update last_fetched_at
         if ($response->status() === 304) {
+            $this->clearPublisherRedirectContinuation($continuations);
             Feed::query()->where('id', $feed->id)->update([
                 'last_fetched_at' => now(),
             ]);
@@ -130,7 +143,7 @@ final class FetchFeedJob implements ShouldQueue
         }
 
         if (! $response->successful()) {
-            $this->handleUnsuccessfulResponse($feed, $response, $gate);
+            $this->handleUnsuccessfulResponse($feed, $response, $gate, $continuations);
 
             return;
         }
@@ -141,13 +154,15 @@ final class FetchFeedJob implements ShouldQueue
             'last_fetched_at' => now(),
         ]);
 
+        $this->clearPublisherRedirectContinuation($continuations);
         ImportFeedItemsJob::dispatch($this->feedId, $response->body());
     }
 
     private function handleUnsuccessfulResponse(
         Feed $feed,
-        Response $response,
+        SafeOutboundResponse $response,
         PublisherRequestGate $gate,
+        PublisherRedirectContinuationStore $continuations,
     ): void {
         Log::warning('FetchFeedJob: unsuccessful response', [
             'feed_id' => $this->feedId,
@@ -161,7 +176,7 @@ final class FetchFeedJob implements ShouldQueue
                 $seconds = $gate->cooldownFor($response->header('Retry-After'), $this->attempts());
                 $this->retryDelaySeconds = $seconds;
                 $originalSaved = $gate->cooldown($feed->url, $seconds);
-                $effectiveSaved = $gate->cooldown((string) $response->effectiveUri(), $seconds);
+                $effectiveSaved = $gate->cooldown($response->effectiveUrl, $seconds);
                 if (! $originalSaved || ! $effectiveSaved) {
                     throw new RuntimeException('Unable to persist the publisher cooldown.');
                 }
@@ -177,6 +192,8 @@ final class FetchFeedJob implements ShouldQueue
                 "Temporary HTTP {$response->status()} while fetching feed {$this->feedId}."
             );
         }
+
+        $this->clearPublisherRedirectContinuation($continuations);
     }
 
     private function isRetryableStatus(int $status): bool
@@ -193,6 +210,7 @@ final class FetchFeedJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        app(PublisherRedirectContinuationStore::class)->forget($this->publisherRedirectIdentity());
         Log::error('FetchFeedJob: exhausted all attempts', [
             'feed_id' => $this->feedId,
             'error_class' => $exception ? $exception::class : null,

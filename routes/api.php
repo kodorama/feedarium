@@ -8,6 +8,8 @@ use App\Domains\News\Controllers\ListNewsController;
 use App\Domains\User\Controllers\ListUserController;
 use App\Domains\Feed\Controllers\CreateFeedController;
 use App\Domains\Feed\Controllers\DeleteFeedController;
+use App\Domains\Feed\Controllers\ExportOpmlController;
+use App\Domains\Feed\Controllers\ImportOpmlController;
 use App\Domains\Feed\Controllers\ToggleFeedController;
 use App\Domains\Feed\Controllers\UpdateFeedController;
 use App\Domains\News\Controllers\CreateNewsController;
@@ -19,6 +21,7 @@ use App\Domains\News\Controllers\UpdateNewsController;
 use App\Domains\User\Controllers\CreateUserController;
 use App\Domains\User\Controllers\DeleteUserController;
 use App\Domains\User\Controllers\UpdateUserController;
+use App\Domains\Feed\Controllers\PreviewOpmlController;
 use App\Domains\Feed\Controllers\SearchFeedsController;
 use App\Domains\News\Controllers\SaveArticleController;
 use App\Domains\News\Controllers\ScoutImportController;
@@ -53,6 +56,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/feeds/{id}', DeleteFeedController::class);
     Route::patch('/feeds/{id}/toggle', ToggleFeedController::class);
     Route::patch('/feeds/{id}/customize', CustomizeFeedController::class);
+    Route::get('/feeds/opml/export', ExportOpmlController::class);
+    Route::post('/feeds/opml/preview', PreviewOpmlController::class);
+    Route::post('/feeds/opml/import', ImportOpmlController::class);
 
     // Categories
     Route::get('/categories', ListCategoryController::class);

@@ -27,6 +27,12 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('settings/FeedSources');
     })->name('settings.feeds');
 
+    Route::get('settings/import-export', function () {
+        abort_unless(auth()->user()?->is_admin === true, 403);
+
+        return Inertia::render('settings/ImportExport');
+    })->name('settings.import-export');
+
     Route::get('settings/search', function () {
         return Inertia::render('settings/Search', [
             'scoutDriver' => config('scout.driver'),

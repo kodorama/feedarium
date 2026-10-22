@@ -14,7 +14,7 @@ RUN npm run build
 # Stage 2 – Production image
 # PHP-FPM + nginx + supervisord in one image for easy Portainer/CasaOS hosting
 
-FROM php:8.4-fpm-alpine AS production
+FROM php:8.5.12-fpm-alpine AS production
 
 # System packages and PHP extensions
 RUN apk add --no-cache \
@@ -53,10 +53,12 @@ pdo_pgsql \
 pdo_sqlite \
 zip \
 bcmath \
-opcache \
 xml \
 gmp \
 && rm -rf /tmp/pear /var/cache/apk/*
+
+# Fail the build if the official image tag does not contain the patched runtime.
+RUN php -r 'if (PHP_VERSION_ID < 80512) { fwrite(STDERR, "PHP 8.5.12 or newer is required.\n"); exit(1); }'
 
 # Composer
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer

@@ -27,7 +27,7 @@ Feedarium is an elegant, modern open-source RSS reader built with Laravel and Vu
 
 ## Requirements
 
-- PHP 8.4 or higher
+- PHP 8.5.12 or higher (security-patched baseline)
 - Composer
 - Node.js & NPM
 - Docker & Docker Compose (for Docker installation)

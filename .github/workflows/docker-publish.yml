@@ -79,6 +79,7 @@ jobs:
           context: .
           file: docker/Dockerfile.prod
           platforms: ${{ matrix.platform }}
+          pull: true
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.metadata.outputs.version }}-${{ matrix.suffix }}
           labels: ${{ needs.metadata.outputs.labels }}

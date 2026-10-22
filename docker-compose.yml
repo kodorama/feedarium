@@ -44,6 +44,8 @@ services:
             dockerfile: docker/Dockerfile
         working_dir: /var/www/html
         command: php artisan queue:work --tries=3 --timeout=120
+        environment:
+            CACHE_STORE: redis
         volumes:
             - .:/var/www/html
         depends_on:
@@ -57,6 +59,8 @@ services:
             dockerfile: docker/Dockerfile
         working_dir: /var/www/html
         command: php artisan schedule:work
+        environment:
+            CACHE_STORE: redis
         volumes:
             - .:/var/www/html
         depends_on:

@@ -417,9 +417,19 @@ docker compose exec app php artisan migrate:status
 
 ### Running tests
 
+Running tests in the existing container does not make the database safe. PHPUnit process/server variable precedence or cached Laravel configuration can select a persistent database. Never assume `APP_ENV=testing`, `phpunit.xml`, or container reuse alone selects an isolated database. The `Tests\TestCase` guard must verify fully booted effective configuration before `RefreshDatabase` runs. Before tests, perform a read-only Artisan probe with explicit environment overrides and confirm `app()->environment() === 'testing'`, `config('database.default') === 'sqlite'`, SQLite driver is `sqlite`, SQLite database is exactly `:memory:`, and its URL is empty. Stop if any check fails.
+
+Run the probe and tests in the existing `app` service; do not provision or recreate services. Explicitly set runtime environment and database isolation values because a stale configuration cache can override environment variables:
+
 ```bash
-php artisan test --compact
-php artisan test --compact --filter=FetchFeedJobTest
+docker compose exec -T app env APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL= CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync SCOUT_DRIVER=database php artisan tinker --execute="dump([app()->environment(), config('database.default'), config('database.connections.sqlite.driver'), config('database.connections.sqlite.database'), config('database.connections.sqlite.url')]);"
+docker compose exec -T app env APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL= CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync SCOUT_DRIVER=database php artisan test --compact
+```
+
+The effective-config guard in `Tests\TestCase` is authoritative and rejects persistent or stale cached database configuration before Laravel test traits such as `RefreshDatabase` can migrate or reset anything. PHPUnit server overrides also neutralize `$_SERVER` precedence, but do not replace the guard or runtime probe.
+
+```bash
+docker compose exec -T app env APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=:memory: DB_URL= CACHE_STORE=array SESSION_DRIVER=array QUEUE_CONNECTION=sync SCOUT_DRIVER=database php artisan test --compact --filter=FetchFeedJobTest
 ```
 
 ### Code formatting

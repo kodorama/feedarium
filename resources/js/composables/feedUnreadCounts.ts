@@ -18,6 +18,21 @@ export async function runOptimisticMutation<T>(mutation: () => Promise<T>, onSuc
     }
 }
 
+/** Applies local read state synchronously before starting its server mutation. */
+export function runOptimisticRead<T>(
+    isAlreadyRead: () => boolean,
+    applyOptimisticRead: () => void,
+    mutation: () => Promise<T>,
+    onSuccess: (result: T) => void,
+    onFailure: () => void,
+): Promise<boolean> {
+    if (isAlreadyRead()) return Promise.resolve(false);
+
+    applyOptimisticRead();
+
+    return runOptimisticMutation(mutation, onSuccess, onFailure);
+}
+
 export function sumCategoryUnreadCounts<T extends { id: number; category_id: number | null }>(
     feeds: T[],
     unreadCountForFeed: (feed: T) => number,

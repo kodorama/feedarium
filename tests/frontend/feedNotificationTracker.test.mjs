@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { computed, ref, triggerRef } from 'vue';
 import { mergeArticlePages, mergeSnapshotPage } from '../../resources/js/composables/feedArticlePages.ts';
 import { FeedNotificationTracker, loadAtSnapshot } from '../../resources/js/composables/feedNotificationTracker.ts';
-import { FeedUnreadCountState, runOptimisticMutation, sumCategoryUnreadCounts } from '../../resources/js/composables/feedUnreadCounts.ts';
+import {
+    FeedUnreadCountState,
+    runOptimisticMutation,
+    runOptimisticRead,
+    sumCategoryUnreadCounts,
+} from '../../resources/js/composables/feedUnreadCounts.ts';
 
 const filters = { feed_id: 7 };
 const result = (count, latest_id) => ({ count, latest_id });
@@ -47,6 +53,8 @@ test('keeps the notice in the sticky toolbar and articles on document scrolling'
     assert.match(page, /document\.querySelectorAll<HTMLElement>\('\[data-article-id\]'\)/);
     assert.match(page, /window\.scrollBy\(0, element\.getBoundingClientRect\(\)\.top - anchor\.top\)/);
     assert.match(readStatus, /_readIds\.value\.delete\(id\)[\s\S]*_unreadCounts\.rollbackRead\(feedId\)/);
+    assert.match(readStatus, /await runOptimisticRead\([\s\S]*_readIds\.value\.has\(id\)[\s\S]*addRead\(id, feedId\)[\s\S]*axios\.patch/);
+    assert.match(readStatus, /function adjustedFeedCount[\s\S]*_feedReadDelta\.value[\s\S]*_zeroedFeeds\.value[\s\S]*_unreadCounts\.unreadCount/);
     assert.match(readStatus, /return runOptimisticMutation\([\s\S]*_markAllSignal\.value =/);
     assert.match(readStatus, /applyAuthoritativeSnapshot\([\s\S]*response\.data\.affected_feed_ids[\s\S]*requestId/);
     assert.match(sidebar, /if \(\!\(await markAllAsRead\(\{ categoryId \}\)\)\) return/);
@@ -86,11 +94,22 @@ test('reconciles unread snapshots with optimistic reads and repeated polls', () 
     assert.equal(counts.unreadCount(7, 99), 4);
 });
 
-test('rolls back rejected read mutations and permits a later retry', async () => {
+test('rolls back rejected optimistic reads and permits a later retry', async () => {
     const counts = new FeedUnreadCountState();
-    const readIds = new Set([42]);
-    counts.addRead(7);
-    const failed = await runOptimisticMutation(
+    const feeds = [
+        { id: 7, category_id: 2 },
+        { id: 8, category_id: 2 },
+    ];
+    const readIds = new Set();
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 5, 8: 3 }, initial);
+    const categoryCount = () => sumCategoryUnreadCounts(feeds, (feed) => counts.unreadCount(feed.id, 99)).get(2);
+    const failedPromise = runOptimisticRead(
+        () => readIds.has(42),
+        () => {
+            readIds.add(42);
+            counts.addRead(7);
+        },
         async () => {
             throw new Error('read request failed');
         },
@@ -100,23 +119,134 @@ test('rolls back rejected read mutations and permits a later retry', async () =>
             counts.rollbackRead(7);
         },
     );
+    assert.equal(counts.unreadCount(7, 99), 4);
+    assert.equal(categoryCount(), 7);
+    const failed = await failedPromise;
 
     assert.equal(failed, false);
     assert.equal(readIds.has(42), false);
     assert.equal(counts.unreadCount(7, 5), 5);
+    assert.equal(categoryCount(), 8);
 
-    readIds.add(42);
-    counts.addRead(7);
-    const retried = await runOptimisticMutation(
+    const retriedPromise = runOptimisticRead(
+        () => readIds.has(42),
+        () => {
+            readIds.add(42);
+            counts.addRead(7);
+        },
         async () => ({ ok: true }),
         () => counts.confirmRead(7),
-        () => counts.rollbackRead(7),
+        () => {
+            readIds.delete(42);
+            counts.rollbackRead(7);
+        },
     );
+    assert.equal(counts.unreadCount(7, 99), 4);
+    const retried = await retriedPromise;
     assert.equal(retried, true);
 
     const afterRetry = counts.beginSnapshotRequest();
-    assert.equal(counts.acceptSnapshot({ 7: 4 }, afterRetry), true);
+    assert.equal(counts.acceptSnapshot({ 7: 4, 8: 3 }, afterRetry), true);
     assert.equal(counts.unreadCount(7, 5), 4);
+    assert.equal(categoryCount(), 7);
+});
+
+test('optimistically updates feed and category badges before a read request resolves', async () => {
+    const counts = new FeedUnreadCountState();
+    const feeds = [
+        { id: 7, category_id: 2 },
+        { id: 8, category_id: 2 },
+    ];
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 3, 8: 4 }, initial);
+    const readIds = new Set();
+    const feedReadDelta = ref(new Map());
+    const childUnread = computed(() => {
+        void feedReadDelta.value;
+        return counts.unreadCount(7, 99);
+    });
+    const categoryUnread = computed(() => {
+        void feedReadDelta.value;
+        return sumCategoryUnreadCounts(feeds, (feed) => counts.unreadCount(feed.id, 99)).get(2);
+    });
+    let resolveRead;
+    let mutationCalls = 0;
+    const startRead = () =>
+        runOptimisticRead(
+            () => readIds.has(42),
+            () => {
+                readIds.add(42);
+                counts.addRead(7);
+                feedReadDelta.value = counts.getReadDeltas();
+                triggerRef(feedReadDelta);
+            },
+            () => {
+                mutationCalls++;
+                return new Promise((resolve) => (resolveRead = resolve));
+            },
+            () => counts.confirmRead(7),
+            () => {
+                readIds.delete(42);
+                counts.rollbackRead(7);
+                feedReadDelta.value = counts.getReadDeltas();
+                triggerRef(feedReadDelta);
+            },
+        );
+
+    // Evaluate both Vue computeds before the mutation so this proves that the
+    // read-delta dependency invalidates their cached values synchronously.
+    assert.equal(childUnread.value, 3);
+    assert.equal(categoryUnread.value, 7);
+
+    const readRequest = startRead();
+    assert.equal(readIds.has(42), true);
+    assert.equal(mutationCalls, 1);
+    assert.equal(childUnread.value, 2);
+    assert.equal(categoryUnread.value, 6);
+
+    // A poll started while the request is pending cannot overwrite the immediate delta.
+    const concurrentPoll = counts.beginSnapshotRequest();
+    assert.equal(counts.acceptSnapshot({ 7: 2, 8: 4 }, concurrentPoll), true);
+    feedReadDelta.value = counts.getReadDeltas();
+    triggerRef(feedReadDelta);
+    assert.equal(childUnread.value, 2);
+    assert.equal(categoryUnread.value, 6);
+
+    // A second click while the first request is pending is ignored.
+    assert.equal(await startRead(), false);
+    assert.equal(mutationCalls, 1);
+    assert.equal(childUnread.value, 2);
+
+    resolveRead({ ok: true });
+    assert.equal(await readRequest, true);
+    assert.equal(childUnread.value, 2);
+    assert.equal(categoryUnread.value, 6);
+
+    // A later server snapshot reconciles the confirmed delta without changing its count.
+    const reconciledPoll = counts.beginSnapshotRequest();
+    assert.equal(counts.acceptSnapshot({ 7: 2, 8: 4 }, reconciledPoll), true);
+    feedReadDelta.value = counts.getReadDeltas();
+    triggerRef(feedReadDelta);
+    assert.equal(childUnread.value, 2);
+    assert.equal(categoryUnread.value, 6);
+    assert.deepEqual(counts.getReadDeltas(), new Map());
+});
+
+test('does not send another read request for an article already marked read', async () => {
+    const readIds = new Set([42]);
+    let mutationCalls = 0;
+    const applied = await runOptimisticRead(
+        () => readIds.has(42),
+        () => assert.fail('already-read articles must not be optimistically mutated'),
+        async () => {
+            mutationCalls++;
+        },
+        () => {},
+        () => {},
+    );
+
+    assert.equal(applied, false);
+    assert.equal(mutationCalls, 0);
 });
 
 test('does not apply mark-all state after a rejected request', async () => {
@@ -230,6 +360,32 @@ test('reconciles repeated mark-all responses, new arrivals and category totals',
             [3, 2],
         ]),
     );
+});
+
+test('a successful child-feed read updates the child badge and summed category badge', async () => {
+    const counts = new FeedUnreadCountState();
+    const feeds = [
+        { id: 7, category_id: 2 },
+        { id: 8, category_id: 2 },
+    ];
+    const initial = counts.beginSnapshotRequest();
+    counts.acceptSnapshot({ 7: 3, 8: 4 }, initial);
+    const categoryCount = () => sumCategoryUnreadCounts(feeds, (feed) => counts.unreadCount(feed.id, 0)).get(2);
+
+    assert.equal(counts.unreadCount(7, 0), 3);
+    assert.equal(categoryCount(), 7);
+
+    counts.addRead(7);
+    const succeeded = await runOptimisticMutation(
+        async () => ({ ok: true }),
+        () => counts.confirmRead(7),
+        () => counts.rollbackRead(7),
+    );
+
+    assert.equal(succeeded, true);
+    assert.equal(counts.unreadCount(7, 0), 2);
+    assert.equal(counts.unreadCount(8, 0), 4);
+    assert.equal(categoryCount(), 6);
 });
 
 test('mark-all only reconciles affected feeds and keeps unrelated optimistic reads', () => {
@@ -440,6 +596,150 @@ test('failed acknowledgement retains displayed IDs so a later poll does not rean
     assert.equal(calls[1].method, 'POST');
     assert.equal(tracker.getState().count, 3);
     assert.equal(tracker.getState().acknowledgedId, 100);
+});
+
+test('acknowledges refresh contents after an overlapping poll completes', async () => {
+    let resolvePoll;
+    const calls = [];
+    const tracker = new FeedNotificationTracker((params, method) => {
+        calls.push({ params, method });
+        if (calls.length === 1) return new Promise((resolve) => (resolvePoll = resolve));
+
+        return Promise.resolve(result(0, 105));
+    });
+    const firstGeneration = tracker.beginContext();
+    tracker.initializeContext(filters, 100, firstGeneration);
+
+    const oldPoll = tracker.checkForUpdates(filters);
+    const refreshGeneration = tracker.beginContext();
+    const refreshAcknowledgement = tracker.acknowledgeDisplayed(105, filters, [101, 102, 103, 104, 105], refreshGeneration);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    resolvePoll(result(5, 105));
+    await Promise.all([oldPoll, refreshAcknowledgement]);
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].params.through_id, 105);
+    assert.deepEqual(tracker.getState(), {
+        count: 0,
+        importedId: 105,
+        acknowledgedId: 105,
+        displayedIds: [],
+        initialized: true,
+    });
+});
+
+test('recounts rows newer than the refresh snapshot after an overlapping poll raises high-water', async () => {
+    const calls = [];
+    let resolveStalePoll;
+    const tracker = new FeedNotificationTracker((params) => {
+        calls.push(params);
+        if (calls.length === 1) return result(10, 105);
+        if (calls.length === 2) return new Promise((resolve) => (resolveStalePoll = resolve));
+        if (params.through_id === 105) return result(0, 105);
+        if (params.after_id === 105) return result(5, 110);
+
+        throw new Error('unexpected tracker request');
+    });
+    const firstGeneration = tracker.beginContext();
+    tracker.initializeContext(filters, 100, firstGeneration);
+    await tracker.checkForUpdates(filters);
+    const stalePoll = tracker.checkForUpdates(filters);
+    const refreshGeneration = tracker.beginContext();
+    const refreshAcknowledgement = tracker.acknowledgeDisplayed(105, filters, [101, 102, 103, 104, 105], refreshGeneration);
+
+    resolveStalePoll(result(10, 110));
+    await Promise.all([stalePoll, refreshAcknowledgement]);
+
+    assert.equal(calls.length, 4);
+    assert.equal(calls[2].through_id, 105);
+    assert.equal(calls[3].after_id, 105);
+    assert.deepEqual(tracker.getState(), {
+        count: 5,
+        importedId: 110,
+        acknowledgedId: 105,
+        displayedIds: [],
+        initialized: true,
+    });
+});
+
+test('failed post-refresh recount keeps the previous visible count and acknowledgement watermark', async () => {
+    const calls = [];
+    let resolveStalePoll;
+    const tracker = new FeedNotificationTracker((params) => {
+        calls.push(params);
+        if (calls.length === 1) return result(10, 105);
+        if (calls.length === 2) return new Promise((resolve) => (resolveStalePoll = resolve));
+        if (params.through_id === 105) return result(0, 105);
+        if (params.after_id === 105) throw new Error('post-snapshot recount failed');
+
+        throw new Error('unexpected tracker request');
+    });
+    const firstGeneration = tracker.beginContext();
+    tracker.initializeContext(filters, 100, firstGeneration);
+    await tracker.checkForUpdates(filters);
+    const stalePoll = tracker.checkForUpdates(filters);
+    const refreshGeneration = tracker.beginContext();
+    const refreshAcknowledgement = tracker.acknowledgeDisplayed(105, filters, [101, 102, 103, 104, 105], refreshGeneration);
+
+    resolveStalePoll(result(10, 110));
+    await Promise.all([stalePoll, refreshAcknowledgement]);
+
+    assert.equal(calls.length, 4);
+    assert.deepEqual(tracker.getState(), {
+        count: 10,
+        importedId: 110,
+        acknowledgedId: 100,
+        displayedIds: [101, 102, 103, 104, 105],
+        initialized: true,
+    });
+});
+
+test('keeps an undisplayed eligible article pending after refresh acknowledgement', async () => {
+    const { tracker, generation } = trackerWith(() => result(1, 105));
+
+    assert.equal(await tracker.acknowledgeDisplayed(105, filters, [101, 102, 103, 104], generation), true);
+    assert.equal(tracker.getState().count, 1);
+    assert.equal(tracker.getState().acknowledgedId, 100);
+});
+
+test('a repeated refresh retries pending acknowledgement with the newly displayed article', async () => {
+    let refresh = 0;
+    const { tracker, generation } = trackerWith(() => {
+        refresh++;
+
+        return result(refresh === 1 ? 1 : 0, 105);
+    });
+
+    assert.equal(await tracker.acknowledgeDisplayed(105, filters, [101, 102, 103, 104], generation), true);
+    assert.equal(tracker.getState().count, 1);
+    assert.equal(tracker.getState().acknowledgedId, 100);
+
+    assert.equal(await tracker.acknowledgeDisplayed(105, filters, [101, 102, 103, 104, 105], generation), true);
+    assert.equal(tracker.getState().count, 0);
+    assert.equal(tracker.getState().acknowledgedId, 105);
+});
+
+test('a newer overlapping acknowledgement reconciles the latest displayed IDs', async () => {
+    const calls = [];
+    let resolveFirst;
+    const { tracker, generation } = trackerWith((params) => {
+        calls.push(params);
+        if (calls.length === 1) return new Promise((resolve) => (resolveFirst = resolve));
+
+        return result(0, 105);
+    });
+
+    const firstAcknowledgement = tracker.acknowledgeDisplayed(105, filters, [101, 102, 103], generation);
+    const latestAcknowledgement = tracker.acknowledgeDisplayed(105, filters, [104, 105], generation);
+    await new Promise((resolve) => setImmediate(resolve));
+    resolveFirst(result(2, 105));
+    await Promise.all([firstAcknowledgement, latestAcknowledgement]);
+
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[1].exclude_ids, [101, 102, 103, 104, 105]);
+    assert.equal(tracker.getState().count, 0);
+    assert.equal(tracker.getState().acknowledgedId, 105);
 });
 
 test('ignores overlapping poll requests and applies only the in-flight response', async () => {
